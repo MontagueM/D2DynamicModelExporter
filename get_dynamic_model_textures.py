@@ -75,10 +75,13 @@ test_dir = 'C:/d2_output'
 #     return ref_pkg_name, ref_file_name, entries_filetype[ref_file_name]
 
 
-def get_float16(hex_data, j):
+def get_float16(hex_data, j, enable_negative=True):
     selection = gf.get_flipped_hex(hex_data[j * 4:j * 4 + 4], 4)
     mantissa_bitdepth = 15
     exp_bitdepth = 15 - mantissa_bitdepth
+    if not enable_negative:
+        mantissa_bitdepth = 16
+        exp_bitdepth = 0
     bias = 2 ** (exp_bitdepth - 1) - 1
     mantissa_division = 2 ** mantissa_bitdepth
     int_fs = int(selection, 16)
@@ -91,6 +94,13 @@ def get_float16(hex_data, j):
     else:
         flt = (1 + mantissa) * 2 ** (exponent - bias)
     return flt, negative
+
+
+def get_signed_int(hexstr, bits):
+    value = int(hexstr, 16)
+    if value & (1 << (bits-1)):
+        value -= 1 << bits
+    return value
 
 
 def get_verts_data(verts_file, all_file_info):
@@ -110,13 +120,13 @@ def get_verts_data(verts_file, all_file_info):
 
         stride_hex = gf.get_hex_data(f'{test_dir}/{ref_pkg_name}/{ref_file}.bin')
 
-        print(stride_header.StrideLength)
+        # print(stride_header.StrideLength)
         hex_data_split = [stride_hex[i:i + stride_header.StrideLength * 2] for i in
                           range(0, len(stride_hex), stride_header.StrideLength * 2)]
     else:
         print(f'Verts: Incorrect type of file {ref_file_type} for ref file {ref_file} verts file {verts_file}')
         return None
-    print(verts_file.name)
+    # print(verts_file.name)
 
     if stride_header.StrideLength == 4:
         """
@@ -146,7 +156,7 @@ def get_verts_data(verts_file, all_file_info):
         """
         Coord info for dynamic, physics-based objects.
         """
-        print('Stride 48')
+        # print('Stride 48')
         coords = get_coords_48(hex_data_split)
     else:
         print(f'Need to add support for stride length {stride_header.StrideLength}')
@@ -160,11 +170,10 @@ def get_coords_4(hex_data_split):
     for hex_data in hex_data_split:
         coord = []
         for j in range(2):
-            flt, negative = get_float16(hex_data, j)
-            flt *= (-1)**negative
-            # if negative:
-            #     flt = 1-flt
-            # flt += 0.5
+            flt = get_signed_int(gf.get_flipped_hex(hex_data[j*4:j*4+4], 4), 16)
+            flt = (flt / 65535) + 2 ** (-1)
+            if j == 1:
+                flt = 1 - flt
             coord.append(flt)
         coords.append(coord)
     return coords
@@ -204,17 +213,14 @@ def get_coords_16(hex_data_split):
 
 def get_coords_20(hex_data_split):
     coords = []
-    print('Do coords 20')
-    coords = []
     for hex_data in hex_data_split:
         coord = []
-        magic, magic_negative = get_float16(hex_data[36:40], 0)
-        for j in range(10):
-            flt, negative = get_float16(hex_data, j)
-            if negative:
-                flt -= (-1) ** magic_negative * magic
-            # if negative:
-            #     flt += -0.35
+        # magic, magic_negative = get_float16(hex_data[36:40], 0)
+        for j in range(2):
+            flt = get_signed_int(gf.get_flipped_hex(hex_data[j:j+4], 4), 16)
+            flt = (flt / 65535) + 2 ** (-1)
+            if j == 1:
+                flt = 1 - flt
             coord.append(flt)
         coords.append(coord)
     return coords
@@ -263,8 +269,6 @@ def get_faces_data(faces_file, all_file_info, lod_0_count):
                     j = 0
                 else:
                     faces.append(face)
-                    if len(faces) == 2191:
-                        print(face)
                     j += 1
         else:
             for i in range(0, len(int_faces_data), 3):
@@ -328,7 +332,7 @@ def write_fbx(faces_data, verts_data, hsh, model_file, temp_direc):
     except:
         pass
     fb.export(save_path=f'C:/d2_model_temp/texture_models/{temp_direc}/{model_file}/{hsh}.fbx')
-    print('Written to file.')
+    print(f'Written {temp_direc}/{model_file}/{hsh} to fbx.')
 
 
 def write_obj(obj_strings, hsh, model_file, temp_direc):
@@ -343,7 +347,7 @@ def write_obj(obj_strings, hsh, model_file, temp_direc):
         pass
     with open(f'C:/d2_model_temp/texture_models/{temp_direc}/{model_file}/{hsh}.obj', 'w') as f:
         f.write(obj_strings)
-    print(f'Written {temp_direc}/{model_file}/{hsh} to file.')
+    print(f'Written {temp_direc}/{model_file}/{hsh} to obj.')
 
 
 def get_verts_faces_files(model_file):
@@ -369,15 +373,16 @@ def get_verts_faces_files(model_file):
                 hf.pkg_name = gf.get_pkg_name(hf.name)
                 if j == 0:
                     hf.header = hf.get_header()
-                    print(hf.name, hf.header.StrideLength)
+                    print(f'Position file {hf.name} stride {hf.header.StrideLength}')
                     pos_verts_files.append(hf)
                 elif j == 8:
                     hf.header = hf.get_header()
-                    print(hf.name, hf.header.StrideLength)
+                    print(f'UV file {hf.name} stride {hf.header.StrideLength}')
                     uv_verts_files.append(hf)
                 elif j == 32:
                     faces_files.append(hf)
-    print(pos_verts_files, uv_verts_files)
+                    break
+    # print(pos_verts_files, uv_verts_files)
     return pos_verts_files, uv_verts_files, faces_files
 
 
@@ -392,8 +397,6 @@ def get_lod_0_faces(model_file, num):
     lod_0_faces = []
     for i in range(num):
         lod_0_faces.append([])
-        print(int(gf.get_flipped_hex(f_hex[offset[i]+40:offset[i]+48], 8), 16))
-        print(int(gf.get_flipped_hex(f_hex[offset[i]+48:offset[i]+56], 8), 16))
         # Triangle strip
         lod_0_faces[-1].append(int(gf.get_flipped_hex(f_hex[offset[i]+40:offset[i]+48], 8), 16))
         # Normal
@@ -415,7 +418,7 @@ def get_model(model_file, all_file_info, temp_direc=''):
         # lod_0_faces_data = get_lod_0(lod_0_faces[i], faces_data)
         obj_str = get_obj_str(coords, faces_data, uv_data)
         write_obj(obj_str, pos_vert_file.uid, model_file, temp_direc)
-        write_fbx(faces_data, coords, gf.get_hash_from_file(pos_vert_file.uid), model_file, temp_direc)
+        write_fbx(faces_data, coords, pos_vert_file.uid, model_file, temp_direc)
 
 
 def export_all_models(pkg_name, all_file_info):
@@ -433,8 +436,8 @@ if __name__ == '__main__':
     # RefID 0x13A5, RefPKG 0x0003
     # parent_file = '0234-16B2'
     # parent_file = '0361-0012'
-    # parent_file = '020E-1F9C'
-    parent_file = '01FE-054A'
+    parent_file = '020E-1F9C'
+    # parent_file = '01FE-054A'
     # parent_file = get_file_from_hash(get_flipped_hex('1A20EC80', 8))
     # print(parent_file)
     get_model(parent_file, all_file_info)
