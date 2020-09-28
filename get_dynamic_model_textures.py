@@ -231,7 +231,7 @@ def get_coords_48(hex_data_split):
     return coords
 
 
-def get_faces_data(faces_file, all_file_info):
+def get_faces_data(faces_file, all_file_info, lod_0_count):
     ref_file = f"{all_file_info[faces_file.name]['RefPKG'][2:]}-{all_file_info[faces_file.name]['RefID'][2:]}"
     ref_pkg_name = gf.get_pkg_name(ref_file)
     ref_file_type = all_file_info[ref_file]['FileType']
@@ -242,8 +242,15 @@ def get_faces_data(faces_file, all_file_info):
         int_faces_data = [int(gf.get_flipped_hex(faces_hex[i:i+4], 4), 16)+1 for i in range(0, len(faces_hex), 4)]
         if 'FFFF' in faces_hex:
             # Implementing triangle strip
+            number_of_ffs = 0
             j = 0
+            offset = 0
             for i in range(0, len(int_faces_data)):
+                i += offset
+                # print(len(faces), number_of_ffs, number_of_ffs*3 + len(faces), lod_0_count+1)
+                # print(ff_encountered, lod_0_count)
+                if number_of_ffs*3 + len(faces) == lod_0_count[0]+1:
+                    return faces
                 if i == len(int_faces_data) - 2:
                     return faces
                 if j % 2 == 0:
@@ -251,12 +258,18 @@ def get_faces_data(faces_file, all_file_info):
                 else:
                     face = [int_faces_data[i+1], int_faces_data[i], int_faces_data[i+2]]
                 if 65536 in face:
+                    offset += 2
+                    number_of_ffs += 1
                     j = 0
                 else:
                     faces.append(face)
+                    if len(faces) == 2191:
+                        print(face)
                     j += 1
         else:
             for i in range(0, len(int_faces_data), 3):
+                if len(faces) == lod_0_count[1]*3:
+                    return faces
                 face = []
                 for j in range(3):
                     face.append(int_faces_data[i + j])
@@ -378,7 +391,13 @@ def get_lod_0_faces(model_file, num):
     offset = [m.start() for m in re.finditer('7E738080', f_hex)]
     lod_0_faces = []
     for i in range(num):
-        lod_0_faces.append(int(gf.get_flipped_hex(f_hex[offset[i]+48:offset[i]+56], 8), 16))
+        lod_0_faces.append([])
+        print(int(gf.get_flipped_hex(f_hex[offset[i]+40:offset[i]+48], 8), 16))
+        print(int(gf.get_flipped_hex(f_hex[offset[i]+48:offset[i]+56], 8), 16))
+        # Triangle strip
+        lod_0_faces[-1].append(int(gf.get_flipped_hex(f_hex[offset[i]+40:offset[i]+48], 8), 16))
+        # Normal
+        lod_0_faces[-1].append(int(gf.get_flipped_hex(f_hex[offset[i]+48:offset[i]+56], 8), 16))
     return lod_0_faces
 
 
@@ -388,15 +407,15 @@ def get_model(model_file, all_file_info, temp_direc=''):
     for i, pos_vert_file in enumerate(pos_verts_files):
         faces_file = faces_files[i]
         coords = get_verts_data(pos_vert_file, all_file_info)
-        faces_data = get_faces_data(faces_file, all_file_info)
+        faces_data = get_faces_data(faces_file, all_file_info, lod_0_faces[i])
         uv_data = get_verts_data(uv_verts_files[i], all_file_info)
         if not coords:
             print(f'{pos_vert_file.uid} not valid')
             continue
-        lod_0_faces_data = get_lod_0(lod_0_faces[i], faces_data)
-        obj_str = get_obj_str(coords, lod_0_faces_data, uv_data)
+        # lod_0_faces_data = get_lod_0(lod_0_faces[i], faces_data)
+        obj_str = get_obj_str(coords, faces_data, uv_data)
         write_obj(obj_str, pos_vert_file.uid, model_file, temp_direc)
-        write_fbx(lod_0_faces_data, coords, gf.get_hash_from_file(pos_vert_file.uid), model_file, temp_direc)
+        write_fbx(faces_data, coords, gf.get_hash_from_file(pos_vert_file.uid), model_file, temp_direc)
 
 
 def export_all_models(pkg_name, all_file_info):
@@ -414,7 +433,8 @@ if __name__ == '__main__':
     # RefID 0x13A5, RefPKG 0x0003
     # parent_file = '0234-16B2'
     # parent_file = '0361-0012'
-    parent_file = '020E-1F9C'
+    # parent_file = '020E-1F9C'
+    parent_file = '01FE-054A'
     # parent_file = get_file_from_hash(get_flipped_hex('1A20EC80', 8))
     # print(parent_file)
     get_model(parent_file, all_file_info)
