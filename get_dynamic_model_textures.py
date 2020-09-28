@@ -378,7 +378,7 @@ def get_lod_0_faces(model_file, num):
     offset = [m.start() for m in re.finditer('7E738080', f_hex)]
     lod_0_faces = []
     for i in range(num):
-        lod_0_faces.append(int(gf.get_flipped_hex(f_hex[offset[i]+40:offset[i]+48], 8), 16))
+        lod_0_faces.append(int(gf.get_flipped_hex(f_hex[offset[i]+48:offset[i]+56], 8), 16))
     return lod_0_faces
 
 
@@ -412,8 +412,8 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
     # RefID 0x13A5, RefPKG 0x0003
-    parent_file = '0234-16B2'
-    parent_file = '0361-0012'
+    # parent_file = '0234-16B2'
+    # parent_file = '0361-0012'
     parent_file = '020E-1F9C'
     # parent_file = get_file_from_hash(get_flipped_hex('1A20EC80', 8))
     # print(parent_file)
