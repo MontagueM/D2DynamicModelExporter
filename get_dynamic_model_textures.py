@@ -75,25 +75,12 @@ test_dir = 'C:/d2_output'
 #     return ref_pkg_name, ref_file_name, entries_filetype[ref_file_name]
 
 
-def get_float16(hex_data, j, enable_negative=True):
-    selection = gf.get_flipped_hex(hex_data[j * 4:j * 4 + 4], 4)
-    mantissa_bitdepth = 15
-    exp_bitdepth = 15 - mantissa_bitdepth
-    if not enable_negative:
-        mantissa_bitdepth = 16
-        exp_bitdepth = 0
-    bias = 2 ** (exp_bitdepth - 1) - 1
-    mantissa_division = 2 ** mantissa_bitdepth
-    int_fs = int(selection, 16)
-    mantissa = int_fs & 2 ** mantissa_bitdepth - 1
-    mantissa_abs = mantissa / mantissa_division
-    exponent = (int_fs >> mantissa_bitdepth) & 2 ** exp_bitdepth - 1
-    negative = int_fs >> mantissa_bitdepth
-    if exponent == 0:
-        flt = mantissa_abs * 2 ** (bias - 1)
-    else:
-        flt = (1 + mantissa) * 2 ** (exponent - bias)
-    return flt, negative
+def get_float16(hex_data, j, is_uv=False):
+    flt = get_signed_int(gf.get_flipped_hex(hex_data[j * 4:j * 4 + 4], 4), 16)
+    if j == 1 and is_uv:
+        flt *= -1
+    flt = (1 + flt / (2 ** 15 - 1)) * 2 ** (-1)
+    return flt
 
 
 def get_signed_int(hexstr, bits):
@@ -150,8 +137,9 @@ def get_verts_data(verts_file, all_file_info):
         coords = get_coords_20(hex_data_split)
     elif stride_header.StrideLength == 24:
         """
+        UV info for dynamic, non-physics objects gear?
         """
-        coords = get_coords_20(hex_data_split)
+        coords = get_coords_24(hex_data_split)
     elif stride_header.StrideLength == 48:
         """
         Coord info for dynamic, physics-based objects.
@@ -170,10 +158,7 @@ def get_coords_4(hex_data_split):
     for hex_data in hex_data_split:
         coord = []
         for j in range(2):
-            flt = get_signed_int(gf.get_flipped_hex(hex_data[j*4:j*4+4], 4), 16)
-            flt = (flt / 65535) + 2 ** (-1)
-            if j == 1:
-                flt = 1 - flt
+            flt = get_float16(hex_data, j, is_uv=True)
             coord.append(flt)
         coords.append(coord)
     return coords
@@ -183,13 +168,9 @@ def get_coords_8(hex_data_split):
     coords = []
     for hex_data in hex_data_split:
         coord = []
-        magic, magic_negative = get_float16(hex_data[12:16], 0)
+        # magic, magic_negative = get_float16(hex_data[12:16], 0)
         for j in range(3):
-            flt, negative = get_float16(hex_data, j)
-            # if negative:
-            #     flt -= (-1) ** magic_negative * magic
-            if negative:
-                flt += -0.35
+            flt = get_float16(hex_data, j, is_uv=False)
             coord.append(flt)
         coords.append(coord)
     return coords
@@ -199,13 +180,9 @@ def get_coords_16(hex_data_split):
     coords = []
     for hex_data in hex_data_split:
         coord = []
-        magic, magic_negative = get_float16(hex_data[12:16], 0)
+        # magic, magic_negative = get_float16(hex_data[12:16], 0)
         for j in range(3):
-            flt, negative = get_float16(hex_data, j)
-            if negative:
-                flt -= (-1) ** magic_negative * magic
-            # if negative:
-            #     flt += -0.35
+            flt = get_float16(hex_data, j, is_uv=False)
             coord.append(flt)
         coords.append(coord)
     return coords
@@ -215,12 +192,19 @@ def get_coords_20(hex_data_split):
     coords = []
     for hex_data in hex_data_split:
         coord = []
-        # magic, magic_negative = get_float16(hex_data[36:40], 0)
         for j in range(2):
-            flt = get_signed_int(gf.get_flipped_hex(hex_data[j:j+4], 4), 16)
-            flt = (flt / 65535) + 2 ** (-1)
-            if j == 1:
-                flt = 1 - flt
+            flt = get_float16(hex_data, j, is_uv=True)
+            coord.append(flt)
+        coords.append(coord)
+    return coords
+
+
+def get_coords_24(hex_data_split):
+    coords = []
+    for hex_data in hex_data_split:
+        coord = []
+        for j in range(2):
+            flt = get_float16(hex_data, j, is_uv=True)
             coord.append(flt)
         coords.append(coord)
     return coords
@@ -386,10 +370,6 @@ def get_verts_faces_files(model_file):
     return pos_verts_files, uv_verts_files, faces_files
 
 
-def get_lod_0(face_count, faces_data):
-    return faces_data[:face_count]
-
-
 def get_lod_0_faces(model_file, num):
     pkg_name = gf.get_pkg_name(model_file)
     f_hex = gf.get_hex_data(f'{test_dir}/{pkg_name}/{model_file}.bin')
@@ -415,7 +395,6 @@ def get_model(model_file, all_file_info, temp_direc=''):
         if not coords:
             print(f'{pos_vert_file.uid} not valid')
             continue
-        # lod_0_faces_data = get_lod_0(lod_0_faces[i], faces_data)
         obj_str = get_obj_str(coords, faces_data, uv_data)
         write_obj(obj_str, pos_vert_file.uid, model_file, temp_direc)
         write_fbx(faces_data, coords, pos_vert_file.uid, model_file, temp_direc)
@@ -435,10 +414,12 @@ if __name__ == '__main__':
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
     # RefID 0x13A5, RefPKG 0x0003
     # parent_file = '0234-16B2'
+    # get_model(parent_file, all_file_info)
     # parent_file = '0361-0012'
     parent_file = '020E-1F9C'
     # parent_file = '01FE-054A'
     # parent_file = get_file_from_hash(get_flipped_hex('1A20EC80', 8))
     # print(parent_file)
+    # parent_file = '0378-03E5'
     get_model(parent_file, all_file_info)
     # export_all_models('city_tower_d2_0369', all_file_info)
