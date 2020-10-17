@@ -79,7 +79,7 @@ def get_float16(hex_data, j, is_uv=False):
     flt = get_signed_int(gf.get_flipped_hex(hex_data[j * 4:j * 4 + 4], 4), 16)
     if j == 1 and is_uv:
         flt *= -1
-    flt = (1 + flt / (2 ** 15 - 1)) * 2 ** (-1)
+    flt = 1 + flt / (2 ** 15 - 1)
     return flt
 
 
@@ -90,7 +90,7 @@ def get_signed_int(hexstr, bits):
     return value
 
 
-def get_verts_data(verts_file, all_file_info):
+def get_verts_data(verts_file, all_file_info, is_uv):
     """
     Stride length 48 is a dynamic and physics-enabled object.
     """
@@ -126,6 +126,10 @@ def get_verts_data(verts_file, all_file_info):
         ? info for dynamic, physics-based objects.
         """
         coords = get_coords_8(hex_data_split)
+    elif stride_header.StrideLength == 12:
+        """
+        """
+        coords = get_coords_12(hex_data_split)
     elif stride_header.StrideLength == 16:
         """
         """
@@ -139,7 +143,24 @@ def get_verts_data(verts_file, all_file_info):
         """
         UV info for dynamic, non-physics objects gear?
         """
-        coords = get_coords_24(hex_data_split)
+        if is_uv:
+            coords = get_coords_24_uv(hex_data_split)
+        else:
+            return None
+            coords = get_coords_24(hex_data_split)
+    elif stride_header.StrideLength == 28:
+        """
+        """
+        coords = get_coords_28(hex_data_split)
+    elif stride_header.StrideLength == 32:
+        """
+        """
+        coords = get_coords_32(hex_data_split)
+    elif stride_header.StrideLength == 40:
+        """
+        """
+        return None
+        coords = get_coords_40(hex_data_split)
     elif stride_header.StrideLength == 48:
         """
         Coord info for dynamic, physics-based objects.
@@ -176,6 +197,18 @@ def get_coords_8(hex_data_split):
     return coords
 
 
+def get_coords_12(hex_data_split):
+    coords = []
+    for hex_data in hex_data_split:
+        coord = []
+        # magic, magic_negative = get_float16(hex_data[12:16], 0)
+        for j in range(3):
+            flt = get_float16(hex_data, j, is_uv=False)
+            coord.append(flt)
+        coords.append(coord)
+    return coords
+
+
 def get_coords_16(hex_data_split):
     coords = []
     for hex_data in hex_data_split:
@@ -199,7 +232,7 @@ def get_coords_20(hex_data_split):
     return coords
 
 
-def get_coords_24(hex_data_split):
+def get_coords_24_uv(hex_data_split):
     coords = []
     for hex_data in hex_data_split:
         coord = []
@@ -207,6 +240,40 @@ def get_coords_24(hex_data_split):
             flt = get_float16(hex_data, j, is_uv=True)
             coord.append(flt)
         coords.append(coord)
+    return coords
+
+
+def get_coords_24(hex_data_split):
+    return None
+    return coords
+
+
+def get_coords_28(hex_data_split):
+    coords = []
+    for hex_data in hex_data_split:
+        coord = []
+        for j in range(3):
+            flt = get_float16(hex_data, j, is_uv=False)
+            coord.append(flt)
+        coords.append(coord)
+    return coords
+
+
+def get_coords_32(hex_data_split):
+    coords = []
+    for hex_data in hex_data_split:
+        hex_data = hex_data[40:]
+        coord = []
+        for j in range(3):
+            flt = get_float16(hex_data, j, is_uv=False)
+            coord.append(flt)
+        coords.append(coord)
+    return coords
+
+
+def get_coords_40(hex_data_split):
+    # Idk how to do 40 yet, just skip it
+    return None
     return coords
 
 
@@ -222,6 +289,7 @@ def get_coords_48(hex_data_split):
 
 
 def get_faces_data(faces_file, all_file_info, lod_0_count):
+    LOD_ENABLED = False
     ref_file = f"{all_file_info[faces_file.name]['RefPKG'][2:]}-{all_file_info[faces_file.name]['RefID'][2:]}"
     ref_pkg_name = gf.get_pkg_name(ref_file)
     ref_file_type = all_file_info[ref_file]['FileType']
@@ -239,8 +307,15 @@ def get_faces_data(faces_file, all_file_info, lod_0_count):
                 i += offset
                 # print(len(faces), number_of_ffs, number_of_ffs*3 + len(faces), lod_0_count+1)
                 # print(ff_encountered, lod_0_count)
-                if number_of_ffs*3 + len(faces) == lod_0_count[0]+1:
-                    return faces
+                if LOD_ENABLED:
+                    if faces_file.name == '0236-1010':
+                        print(number_of_ffs)
+                        # if number_of_ffs*3 + len(faces) == lod_0_count[0]+1 or number_of_ffs > 0:
+                        #     print(number_of_ffs)
+                        #     return faces
+                    else:
+                        if number_of_ffs*3 + len(faces) == lod_0_count[0]+1:
+                            return faces
                 if i == len(int_faces_data) - 2:
                     return faces
                 if j % 2 == 0:
@@ -252,9 +327,14 @@ def get_faces_data(faces_file, all_file_info, lod_0_count):
                     number_of_ffs += 1
                     j = 0
                 else:
+                    # if number_of_ffs < 45000:
+                    #     j += 1
+                    #     continue
                     faces.append(face)
                     j += 1
         else:
+            if len(int_faces_data) % 3 != 0:
+                return None
             for i in range(0, len(int_faces_data), 3):
                 if len(faces) == lod_0_count[1]*3:
                     return faces
@@ -315,7 +395,7 @@ def write_fbx(faces_data, verts_data, hsh, model_file, temp_direc):
         os.mkdir(f'C:/d2_model_temp/texture_models/{temp_direc}/{model_file}')
     except:
         pass
-    fb.export(save_path=f'C:/d2_model_temp/texture_models/{temp_direc}/{model_file}/{hsh}.fbx')
+    fb.export(save_path=f'C:/d2_model_temp/texture_models/{temp_direc}/{model_file}/{hsh}.fbx', ascii_format=False)
     print(f'Written {temp_direc}/{model_file}/{hsh} to fbx.')
 
 
@@ -352,7 +432,7 @@ def get_verts_faces_files(model_file):
             hsh = rel_hex[j:j+8]
             if hsh != 'FFFFFFFF':
                 hf = HeaderFile()
-                hf.uid = gf.get_flipped_hex(hsh, 8)
+                hf.uid = hsh
                 hf.name = gf.get_file_from_hash(hf.uid)
                 hf.pkg_name = gf.get_pkg_name(hf.name)
                 if j == 0:
@@ -374,6 +454,9 @@ def get_lod_0_faces(model_file, num):
     pkg_name = gf.get_pkg_name(model_file)
     f_hex = gf.get_hex_data(f'{test_dir}/{pkg_name}/{model_file}.bin')
     offset = [m.start() for m in re.finditer('7E738080', f_hex)]
+    if len(offset) != num:
+        print('ERROR: Fix this, means one model has no LODs or something.')
+        return None
     lod_0_faces = []
     for i in range(num):
         lod_0_faces.append([])
@@ -385,19 +468,41 @@ def get_lod_0_faces(model_file, num):
 
 
 def get_model(model_file, all_file_info, temp_direc=''):
+    print(f'Parent file {model_file}')
     pos_verts_files, uv_verts_files, faces_files = get_verts_faces_files(model_file)
     lod_0_faces = get_lod_0_faces(model_file, len(pos_verts_files))
+    if not lod_0_faces:
+        return
     for i, pos_vert_file in enumerate(pos_verts_files):
         faces_file = faces_files[i]
-        coords = get_verts_data(pos_vert_file, all_file_info)
+        coords = get_verts_data(pos_vert_file, all_file_info, is_uv=False)
         faces_data = get_faces_data(faces_file, all_file_info, lod_0_faces[i])
-        uv_data = get_verts_data(uv_verts_files[i], all_file_info)
-        if not coords:
+        print(len(faces_data))
+        if len(uv_verts_files) == len(pos_verts_files):
+            uv_data = get_verts_data(uv_verts_files[i], all_file_info, is_uv=True)
+        else:
+            uv_data = []
+        if not coords or not faces_data:
             print(f'{pos_vert_file.uid} not valid')
             continue
-        obj_str = get_obj_str(coords, faces_data, uv_data)
+
+        scaled_pos_verts = scale_verts(coords, model_file)
+        obj_str = get_obj_str(scaled_pos_verts, faces_data, uv_data)
         write_obj(obj_str, pos_vert_file.uid, model_file, temp_direc)
-        write_fbx(faces_data, coords, pos_vert_file.uid, model_file, temp_direc)
+        write_fbx(faces_data, scaled_pos_verts, pos_vert_file.uid, model_file, temp_direc)
+
+
+def scale_verts(verts_data, model_file):
+    pkg_name = gf.get_pkg_name(model_file)
+    model_hex = gf.get_hex_data(f'{test_dir}/{pkg_name}/{model_file}.bin')
+    # TODO fix this, this isn't correct but it is needed.
+    model_scale = [struct.unpack('f', bytes.fromhex(model_hex[j:j + 8]))[0] for j in range(0x70*2, (0x70+12)*2, 8)]
+
+    for i in range(len(verts_data)):
+        for j in range(3):
+            verts_data[i][j] *= model_scale[j]
+
+    return verts_data
 
 
 def export_all_models(pkg_name, all_file_info):
@@ -405,7 +510,7 @@ def export_all_models(pkg_name, all_file_info):
     entries_refpkg = {x: y for x, y in pkg_db.get_entries_from_table(pkg_name, 'FileName, RefPKG') if y == '0x0003'}
     for file in entries_refid.keys():
         if file in entries_refpkg.keys():
-            get_model(file, all_file_info, temp_direc=pkg_name)
+            get_model(file, all_file_info, temp_direc='activities/' + pkg_name)
 
 
 if __name__ == '__main__':
@@ -413,13 +518,18 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
     # RefID 0x13A5, RefPKG 0x0003
-    # parent_file = '0234-16B2'
+    parent_file = '023A-1DE0'
+    parent_file = '0234-16B2'
+    parent_file = '03B8-047B'
     # get_model(parent_file, all_file_info)
     # parent_file = '0361-0012'
-    parent_file = '020E-1F9C'
+    # parent_file = '020E-1F9C'
     # parent_file = '01FE-054A'
     # parent_file = get_file_from_hash(get_flipped_hex('1A20EC80', 8))
     # print(parent_file)
     # parent_file = '0378-03E5'
     get_model(parent_file, all_file_info)
-    # export_all_models('city_tower_d2_0369', all_file_info)
+    # for pkg in pkg_db.get_all_tables():
+    #     if 'activities_' == pkg[:11]:
+    #         if pkg not in os.listdir('C:/d2_model_temp/texture_models/activities'):
+    #             export_all_models(pkg, all_file_info)

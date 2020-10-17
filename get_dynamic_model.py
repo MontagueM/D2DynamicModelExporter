@@ -166,6 +166,7 @@ def get_verts_faces_files(model_file):
         for j in range(0, len(rel_hex), 8):
             hsh = rel_hex[j:j+8]
             if hsh != 'FFFFFFFF':
+                print(hsh)
                 if j == 0:
                     verts_files.append(gf.get_file_from_hash(gf.get_flipped_hex(hsh, 8)))
                 elif j == 8:
@@ -203,7 +204,7 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
     # RefID 0x13A5, RefPKG 0x0003
-    parent_file = '0361-0012'
+    parent_file = '020E-0F86'
     # parent_file = get_file_from_hash(get_flipped_hex('1A20EC80', 8))
     # print(parent_file)
     get_model(parent_file, all_file_info)

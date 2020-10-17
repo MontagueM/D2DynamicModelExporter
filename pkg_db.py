@@ -22,4 +22,4 @@ def get_entries_from_table(pkg_str, column_select='*'):
 def get_all_tables():
     c.execute("select * from sqlite_master")
     table_list = c.fetchall()
-    return table_list
+    return [a[1] for a in table_list]

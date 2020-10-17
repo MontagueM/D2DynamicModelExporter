@@ -307,18 +307,18 @@ def get_model_textures(file, model_file, temp_dir=''):
     pkg = gf.get_pkg_name(file)
     mf1_hex = gf.get_hex_data(f'C:/d2_output/{pkg}/{file}.bin')
     offset = (int(gf.get_flipped_hex(mf1_hex[48:56], 8), 16)+608)*2
-    file = gf.get_file_from_hash(gf.get_flipped_hex(mf1_hex[offset:offset+8], 8))
+    file = gf.get_file_from_hash(mf1_hex[offset:offset+8])
     pkg = gf.get_pkg_name(file)
     print(f'tf C:/d2_output/{pkg}/{file}.bin')
     tf_hex = gf.get_hex_data(f'C:/d2_output/{pkg}/{file}.bin')
     texture_count = int(gf.get_flipped_hex(tf_hex[32*2:36*2], 8), 16)
     texture_entries = []
     for i in range(texture_count):
-        texture_entries.append(gf.get_file_from_hash(gf.get_flipped_hex(tf_hex[36*2+8*i:36*2+8*(i+1)], 8)))
+        texture_entries.append(gf.get_file_from_hash(tf_hex[36*2+8*i:36*2+8*(i+1)]))
     for tex in texture_entries:
         pkg = gf.get_pkg_name(tex)
         tex_hex = gf.get_hex_data(f'C:/d2_output/{pkg}/{tex}.bin')
-        tex = gf.get_file_from_hash(gf.get_flipped_hex(tex_hex[64*2:68*2], 8))
+        tex = gf.get_file_from_hash(tex_hex[64*2:68*2])
         export_image_from_file(tex, temp_dir, model_file)
 
 
