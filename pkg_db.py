@@ -8,7 +8,7 @@ def start_db_connection(version):
     global con
     global c
     print(version)
-    con = sq.connect(f'D:/D2_Datamining/Package Unpacker/db/{version}.db')
+    con = sq.connect(f'I:/d2_pkg_db/{version}.db')
     c = con.cursor()
 
 

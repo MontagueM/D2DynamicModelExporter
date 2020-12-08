@@ -44,7 +44,7 @@ def get_pkg_name(file):
         print(f'{file} is invalid.')
         return None
     pkg_id = file.split('-')[0]
-    for folder in os.listdir('C:/d2_output/'):
+    for folder in os.listdir('I:/d2_output_3_0_0_4/'):
         if pkg_id.lower() in folder.lower():
             pkg_name = folder
             break
@@ -52,3 +52,19 @@ def get_pkg_name(file):
         print(f'Could not find folder for {file}. File is likely not a model or folder does not exist.')
         return None
     return pkg_name
+
+
+def get_uint32(hx, offset):
+    return int.from_bytes(hx[offset:offset+4], byteorder='little')
+
+
+def get_uint16(hx, offset):
+    return int.from_bytes(hx[offset:offset+2], byteorder='little')
+
+
+def get_int32(hx, offset):
+    return int.from_bytes(hx[offset:offset+4], byteorder='little', signed=True)
+
+
+def get_int16(hx, offset):
+    return int.from_bytes(hx[offset:offset+2], byteorder='little', signed=True)

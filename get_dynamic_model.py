@@ -30,7 +30,7 @@ def get_header(file_hex, header):
     return header
 
 
-test_dir = 'C:/d2_output'
+test_dir = 'I:/d2_output_3_0_0_2'
 
 
 # def get_referenced_file(file):
@@ -138,14 +138,14 @@ def get_obj_str(verts_data, faces_data):
 def write_obj(obj_strings, hsh, model_file, temp_direc):
     if temp_direc or temp_direc != '':
         try:
-            os.mkdir(f'C:/d2_model_temp/texture_models/{temp_direc}/')
+            os.mkdir(f'I:/dynamic_models/{temp_direc}/')
         except:
             pass
     try:
-        os.mkdir(f'C:/d2_model_temp/texture_models/{temp_direc}/{model_file}')
+        os.mkdir(f'I:/dynamic_models/{temp_direc}/{model_file}')
     except:
         pass
-    with open(f'C:/d2_model_temp/texture_models/{temp_direc}/{model_file}/{hsh}.obj', 'w') as f:
+    with open(f'I:/dynamic_models/{temp_direc}/{model_file}/{hsh}.obj', 'w') as f:
         f.write(obj_strings)
     print('Written to file.')
 
@@ -200,11 +200,11 @@ def export_all_models(pkg_name, all_file_info):
 
 
 if __name__ == '__main__':
-    pkg_db.start_db_connection('2_9_2_1_all')
+    pkg_db.start_db_connection('3_0_0_2')
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
-    # RefID 0x13A5, RefPKG 0x0003
-    parent_file = '020E-0F86'
+    # dynamic model header 2
+    parent_file = '0159-1B6E'
     # parent_file = get_file_from_hash(get_flipped_hex('1A20EC80', 8))
     # print(parent_file)
     get_model(parent_file, all_file_info)

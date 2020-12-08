@@ -12,7 +12,8 @@ import struct
 @dataclass
 class Stride12Header:
     EntrySize: np.uint32 = np.uint32(0)
-    StrideLength: np.uint32 = np.uint32(0)
+    StrideLength: np.uint16 = np.uint16(0)
+    Unk: np.uint16 = np.uint16(0)
     DeadBeef: np.uint32 = np.uint32(0)
 
 
@@ -56,7 +57,7 @@ def get_header(file_hex, header):
     return header
 
 
-test_dir = 'C:/d2_output'
+test_dir = 'I:/d2_output_3_0_0_4'
 
 
 # def get_referenced_file(file):
@@ -146,7 +147,6 @@ def get_verts_data(verts_file, all_file_info, is_uv):
         if is_uv:
             coords = get_coords_24_uv(hex_data_split)
         else:
-            return None
             coords = get_coords_24(hex_data_split)
     elif stride_header.StrideLength == 28:
         """
@@ -244,9 +244,14 @@ def get_coords_24_uv(hex_data_split):
 
 
 def get_coords_24(hex_data_split):
-    return None
+    coords = []
+    for hex_data in hex_data_split:
+        coord = []
+        for j in range(3):
+            flt = get_float16(hex_data, j, is_uv=False)
+            coord.append(flt)
+        coords.append(coord)
     return coords
-
 
 def get_coords_28(hex_data_split):
     coords = []
@@ -272,8 +277,13 @@ def get_coords_32(hex_data_split):
 
 
 def get_coords_40(hex_data_split):
-    # Idk how to do 40 yet, just skip it
-    return None
+    coords = []
+    for hex_data in hex_data_split:
+        coord = []
+        for j in range(3):
+            flt = get_float16(hex_data, j, is_uv=False)
+            coord.append(flt)
+        coords.append(coord)
     return coords
 
 
@@ -288,9 +298,12 @@ def get_coords_48(hex_data_split):
     return coords
 
 
-def get_faces_data(faces_file, all_file_info, lod_0_count):
+def get_faces_data(faces_file, all_file_info, lod_0_count=None):
     LOD_ENABLED = False
-    ref_file = f"{all_file_info[faces_file.name]['RefPKG'][2:]}-{all_file_info[faces_file.name]['RefID'][2:]}"
+    try:
+        ref_file = f"{all_file_info[faces_file.name]['RefPKG'][2:]}-{all_file_info[faces_file.name]['RefID'][2:]}"
+    except KeyError:
+        return []
     ref_pkg_name = gf.get_pkg_name(ref_file)
     ref_file_type = all_file_info[ref_file]['FileType']
     # ref_pkg_name, ref_file, ref_file_type = get_referenced_file(faces_file)
@@ -336,8 +349,9 @@ def get_faces_data(faces_file, all_file_info, lod_0_count):
             if len(int_faces_data) % 3 != 0:
                 return None
             for i in range(0, len(int_faces_data), 3):
-                if len(faces) == lod_0_count[1]*3:
-                    return faces
+                if LOD_ENABLED:
+                    if len(faces) == lod_0_count[1]*3:
+                        return faces
                 face = []
                 for j in range(3):
                     face.append(int_faces_data[i + j])
@@ -388,28 +402,29 @@ def write_fbx(faces_data, verts_data, hsh, model_file, temp_direc):
     fb.scene.GetRootNode().AddChild(node)
     if temp_direc or temp_direc != '':
         try:
-            os.mkdir(f'C:/d2_model_temp/texture_models/{temp_direc}/')
+            os.mkdir(f'I:/dynamic_models/{temp_direc}/')
         except:
             pass
     try:
-        os.mkdir(f'C:/d2_model_temp/texture_models/{temp_direc}/{model_file}')
+        os.mkdir(f'I:/dynamic_models/{temp_direc}/{model_file}')
     except:
         pass
-    fb.export(save_path=f'C:/d2_model_temp/texture_models/{temp_direc}/{model_file}/{hsh}.fbx', ascii_format=False)
-    print(f'Written {temp_direc}/{model_file}/{hsh} to fbx.')
+    fb.export(save_path=f'I:/dynamic_models/{temp_direc}/{model_file}/{hsh}.fbx', ascii_format=False)
+    print(f'Written I:/dynamic_models/{temp_direc}/{model_file}/{hsh}.fbx.')
 
 
 def write_obj(obj_strings, hsh, model_file, temp_direc):
+    # return
     if temp_direc or temp_direc != '':
         try:
-            os.mkdir(f'C:/d2_model_temp/texture_models/{temp_direc}/')
+            os.mkdir(f'I:/dynamic_models/{temp_direc}/')
         except:
             pass
     try:
-        os.mkdir(f'C:/d2_model_temp/texture_models/{temp_direc}/{model_file}')
+        os.mkdir(f'I:/dynamic_models/{temp_direc}/{model_file}')
     except:
         pass
-    with open(f'C:/d2_model_temp/texture_models/{temp_direc}/{model_file}/{hsh}.obj', 'w') as f:
+    with open(f'I:/dynamic_models/{temp_direc}/{model_file}/{hsh}.obj', 'w') as f:
         f.write(obj_strings)
     print(f'Written {temp_direc}/{model_file}/{hsh} to obj.')
 
@@ -423,7 +438,7 @@ def get_verts_faces_files(model_file):
         model_data_hex = gf.get_hex_data(f'{test_dir}/{pkg_name}/{model_file}.bin')
     except FileNotFoundError:
         print(f'No folder found for file {model_file}. Likely need to unpack it or design versioning system.')
-        return None, None
+        return None, None, None
     # Always at [400, 672, 944, 1216, 1488, ...]
     num = int(gf.get_flipped_hex(model_data_hex[176*2:180*2], 8), 16)
     for i in range(num):
@@ -470,13 +485,16 @@ def get_lod_0_faces(model_file, num):
 def get_model(model_file, all_file_info, temp_direc=''):
     print(f'Parent file {model_file}')
     pos_verts_files, uv_verts_files, faces_files = get_verts_faces_files(model_file)
-    lod_0_faces = get_lod_0_faces(model_file, len(pos_verts_files))
-    if not lod_0_faces:
-        return
+    # lod_0_faces = get_lod_0_faces(model_file, len(pos_verts_files))
+    # if not lod_0_faces:
+    #     return
     for i, pos_vert_file in enumerate(pos_verts_files):
         faces_file = faces_files[i]
         coords = get_verts_data(pos_vert_file, all_file_info, is_uv=False)
-        faces_data = get_faces_data(faces_file, all_file_info, lod_0_faces[i])
+        faces_data = get_faces_data(faces_file, all_file_info)
+        if not faces_data:
+            print('No faces data')
+            return
         print(len(faces_data))
         if len(uv_verts_files) == len(pos_verts_files):
             uv_data = get_verts_data(uv_verts_files[i], all_file_info, is_uv=True)
@@ -487,8 +505,9 @@ def get_model(model_file, all_file_info, temp_direc=''):
             continue
 
         scaled_pos_verts = scale_verts(coords, model_file)
-        obj_str = get_obj_str(scaled_pos_verts, faces_data, uv_data)
-        write_obj(obj_str, pos_vert_file.uid, model_file, temp_direc)
+        # TODO update this so fbx has uvs
+        # obj_str = get_obj_str(scaled_pos_verts, faces_data, uv_data)
+        # write_obj(obj_str, pos_vert_file.uid, model_file, temp_direc)
         write_fbx(faces_data, scaled_pos_verts, pos_vert_file.uid, model_file, temp_direc)
 
 
@@ -506,30 +525,34 @@ def scale_verts(verts_data, model_file):
 
 
 def export_all_models(pkg_name, all_file_info):
-    entries_refid = {x: y for x, y in pkg_db.get_entries_from_table(pkg_name, 'FileName, RefID') if y == '0x13A5'}
-    entries_refpkg = {x: y for x, y in pkg_db.get_entries_from_table(pkg_name, 'FileName, RefPKG') if y == '0x0003'}
-    for file in entries_refid.keys():
-        if file in entries_refpkg.keys():
-            get_model(file, all_file_info, temp_direc='activities/' + pkg_name)
+    entries_type = {x: y for x, y in pkg_db.get_entries_from_table(pkg_name, 'FileName, FileType') if y == 'Dynamic Model Header 2'}
+    for file in list(entries_type.keys()):
+        if file == '01B5-1666':
+            a = 0
+        print(f'Getting file {file}')
+        get_model(file, all_file_info, temp_direc='combatants/' + pkg_name)
 
 
 if __name__ == '__main__':
-    pkg_db.start_db_connection('2_9_2_1_all')
+    pkg_db.start_db_connection('3_0_0_4')
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
     # RefID 0x13A5, RefPKG 0x0003
-    parent_file = '023A-1DE0'
-    parent_file = '0234-16B2'
-    parent_file = '03B8-047B'
+    # parent_file = '023A-1DE0'
+    # parent_file = '0234-16B2'
+    # parent_file = '03B8-047B'
+    parent_file = '01EB-19B2'
+    parent_file = gf.get_file_from_hash('17B8B580')
     # get_model(parent_file, all_file_info)
     # parent_file = '0361-0012'
-    # parent_file = '020E-1F9C'
+    # parent_file = '020E-1F9C'l
     # parent_file = '01FE-054A'
     # parent_file = get_file_from_hash(get_flipped_hex('1A20EC80', 8))
     # print(parent_file)
     # parent_file = '0378-03E5'
     get_model(parent_file, all_file_info)
-    # for pkg in pkg_db.get_all_tables():
-    #     if 'activities_' == pkg[:11]:
-    #         if pkg not in os.listdir('C:/d2_model_temp/texture_models/activities'):
-    #             export_all_models(pkg, all_file_info)
+    quit()
+    for pkg in pkg_db.get_all_tables():
+        if 'cinematic' in pkg:
+            # if pkg not in os.listdir('C:/d2_model_temp/texture_models/tower'):
+                export_all_models(pkg, all_file_info)
