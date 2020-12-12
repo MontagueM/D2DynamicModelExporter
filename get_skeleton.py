@@ -30,9 +30,9 @@ def get_skeleton(file):
     default_object_space_transforms is dost
     default_inverse_object_space_transforms is diost
     """
-    fbin = open(f'I:/d2_output_3_0_0_4/{gf.get_pkg_name(file)}/{file}.bin', 'rb').read()
+    fbin = open(f'I:/d2_output_3_0_1_0/{gf.get_pkg_name(file)}/{file}.bin', 'rb').read()
     offset = fbin.find(b'\x42\x86\x80\x80') - 0x88
-    if offset == -1:
+    if offset == -0x89:
         raise Exception('Not valid file')
     nodes_size = gf.get_uint32(fbin, offset)
     nodes_offset = gf.get_uint32(fbin, offset+0x8) + offset+0x8 + 0x10
@@ -80,6 +80,6 @@ def test_export(file, nodes):
 
 
 if __name__ == '__main__':
-    skeleton_file = '0159-1768'
+    skeleton_file = '0148-0982'
     nodes = get_skeleton(skeleton_file)
     test_export(skeleton_file, nodes)
