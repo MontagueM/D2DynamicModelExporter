@@ -365,9 +365,6 @@ def get_submeshes(file, pos_verts, face_hex):
         else:
             fhex = face_hex[entry.FaceOffset*4:entry.FaceOffset*4+entry.FaceCount*4]  # Doubled as not byte count but vert index count
 
-        if i == 7:
-            a = 0
-
         submesh.faces = get_submesh_faces(fhex)
         # faces = faces[entry.FaceCount:]
 
@@ -379,7 +376,18 @@ def get_submeshes(file, pos_verts, face_hex):
         submesh.name = f'{gf.get_hash_from_file(file)}_{i}_{len(submesh.faces)}'
         submesh.material = entry.Material
         submesh.lod_level = entry.LODLevel
+        submesh.entry = entry
         submeshes.append(submesh)
+
+    # Removing duplicate submeshes
+    # This will need changing when materials get implemented
+    existing_face_counts = []
+    for submesh in list(submeshes):
+        if submesh.entry.FaceOffset not in existing_face_counts:
+            existing_face_counts.append(submesh.entry.FaceOffset)
+        else:
+            submeshes.remove(submesh)
+
     return submeshes
 
 
@@ -416,10 +424,6 @@ def write_submesh_fbx(submesh: Submesh, temp_direc, model_file):
         pass
     fb.export(save_path=f'I:/dynamic_models/{temp_direc}/{model_file}/{submesh.name}.fbx', ascii_format=False)
     print(f'Written I:/dynamic_models/{temp_direc}/{model_file}/{submesh.name}.fbx.')
-
-    obj_str = get_obj_str(submesh.pos_verts, submesh.faces, [])
-    write_obj(obj_str, submesh.name, model_file, temp_direc)
-    a = 0
 
 
 def get_submesh_faces(faces_hex):
@@ -689,8 +693,8 @@ def get_model(model_file, all_file_info, temp_direc=''):
             # break
             if not first_mat:
                 first_mat = submesh.material
-            if first_mat != submesh.material:
-                break
+            # if first_mat != submesh.material:
+            #     break
             if submesh.lod_level == 0:
                 write_submesh_fbx(submesh, temp_direc, model_file)
         # write_fbx(faces_data, coords, pos_vert_file.uid, model_file, temp_direc)
