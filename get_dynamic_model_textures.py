@@ -317,21 +317,21 @@ class SubmeshEntry:
         self.Material = None
         self.x4 = None
         self.five = None
-        self.x8 = None
-        self.xC = None
-        self.FaceCount = None
+        self.FaceOffset = None  # x8
+        self.FaceCount = None  # xC
+        self.EndFaceCount = None  # x10
         self.x14 = None
         self.x16 = None
         self.x18 = None
         self.x1A = None
-        self.LODLevel = None
+        self.LODLevel = None  # x1B
         self.x1C = None
         self.x0000 = None
         self.FFFFFFFF = None
 
 
-def get_submeshes(file, pos_verts, faces):
-    faces_ = faces
+def get_submeshes(file, pos_verts, face_hex):
+    # faces_ = faces
     # Getting the submesh table entries
     fbin = open(f'I:/d2_output_3_0_1_0/{gf.get_pkg_name(file)}/{file}.bin', 'rb').read()
     offset = fbin.find(b'\xCB\x6E\x80\x80')
@@ -343,29 +343,45 @@ def get_submeshes(file, pos_verts, faces):
     for i in range(offset, offset+0x24*entry_count, 0x24):
         entry = SubmeshEntry()
         entry.Material = fbin[i:i+4]
-        entry.FaceCount = gf.get_uint32(fbin, i+0x10)
+        entry.FaceOffset = gf.get_uint32(fbin, i+0x8)
+        entry.FaceCount = gf.get_uint32(fbin, i+0xC)
+        entry.EndFaceCount = gf.get_uint32(fbin, i+0x10)
         entry.LODLevel = fbin[i+0x1B]
         entries.append(entry)
 
     # Making submeshes
     submeshes = []
     for i, entry in enumerate(entries):
-        if i != 0:
-            if entry.Material != entries[i-1].Material:
-                faces = faces_
+        # if i != 0:
+        #     if entry.Material != entries[i-1].Material:
+        #         faces = faces_
         submesh = Submesh()
-        submesh.faces = faces[:entry.FaceCount]
-        faces = faces[entry.FaceCount:]
+        # submesh.faces = faces[entry.FaceOffset:entry.FaceOffset+entry.FaceCount]
+
+        # submesh.faces = faces[:entry.FaceCount]
+        # faces = faces[entry.FaceCount:]
+        if 'FFFFFFFF' in face_hex:
+            fhex = face_hex[entry.FaceOffset*8:entry.FaceOffset*8+entry.FaceCount*8]  # Doubled as not byte count but vert index count
+        else:
+            fhex = face_hex[entry.FaceOffset*4:entry.FaceOffset*4+entry.FaceCount*4]  # Doubled as not byte count but vert index count
+
+        if i == 7:
+            a = 0
+
+        submesh.faces = get_submesh_faces(fhex)
+        # faces = faces[entry.FaceCount:]
+
         # verts_used = []
         # [verts_used.extend(x) for x in faces]
         # verts_used = list(set(verts_used))
         # submesh.pos_verts = [pos_verts[i-1] for i in verts_used]
         submesh.pos_verts = pos_verts
-        submesh.name = f'{gf.get_hash_from_file(file)}_{i}'
+        submesh.name = f'{gf.get_hash_from_file(file)}_{i}_{len(submesh.faces)}'
         submesh.material = entry.Material
         submesh.lod_level = entry.LODLevel
         submeshes.append(submesh)
     return submeshes
+
 
 def write_submesh_fbx(submesh: Submesh, temp_direc, model_file):
     controlpoints = [fbx.FbxVector4(-x[0], x[2], x[1]) for x in submesh.pos_verts]
@@ -405,69 +421,74 @@ def write_submesh_fbx(submesh: Submesh, temp_direc, model_file):
     write_obj(obj_str, submesh.name, model_file, temp_direc)
     a = 0
 
-def get_faces_data(faces_file, all_file_info, lod_0_count=None):
-    LOD_ENABLED = False
+
+def get_submesh_faces(faces_hex):
+    if 'FFFFFFFF' in faces_hex:
+        faces_hex = faces_hex.split('FFFFFFFF')
+        int_faces_data = [[int(gf.get_flipped_hex(f[i:i + 8], 8), 16) + 1 for i in
+                           range(0, len(f), 8)] for f in faces_hex]
+    else:
+        faces_hex = faces_hex.split('FFFF')
+        int_faces_data = [[int(gf.get_flipped_hex(f[i:i + 4], 4), 16) + 1 for i in
+                           range(0, len(f), 4)] for f in faces_hex]
+    faces = []
+    for strip in int_faces_data:
+        j = 0
+        while True:
+            if j + 2 == len(strip):
+                break
+            if j % 2 == 0:
+                faces.append(strip[j:j + 3])
+            else:
+                faces.append([strip[j + 1], strip[j], strip[j + 2]])
+            j += 1
+    return faces
+
+
+def get_face_hex(faces_file, all_file_info) -> list:
     try:
         ref_file = f"{all_file_info[faces_file.name]['RefPKG'][2:]}-{all_file_info[faces_file.name]['RefID'][2:]}"
     except KeyError:
         return []
     ref_pkg_name = gf.get_pkg_name(ref_file)
     ref_file_type = all_file_info[ref_file]['FileType']
-    # ref_pkg_name, ref_file, ref_file_type = get_referenced_file(faces_file)
-    faces = []
     if ref_file_type == "Faces Data":
         faces_hex = gf.get_hex_data(f'{test_dir}/{ref_pkg_name}/{ref_file}.bin')
-        if 'FFFFFFFF' in faces_hex:
-            int_faces_data = [int(gf.get_flipped_hex(faces_hex[i:i + 8], 8), 16) + 1 for i in
-                              range(0, len(faces_hex), 8)]
-        else:
-            int_faces_data = [int(gf.get_flipped_hex(faces_hex[i:i + 4], 4), 16) + 1 for i in
-                              range(0, len(faces_hex), 4)]
+        return faces_hex
+    return []
+
+
+def get_faces_data(faces_file, all_file_info):
+    faces_hex = get_face_hex(faces_file, all_file_info)
+    if faces_hex:
         if 'FFFF' in faces_hex:
             # Implementing triangle strip
-            number_of_ffs = 0
-            j = 0
-            offset = 0
-            for i in range(0, len(int_faces_data)):
-                i += offset
-                # print(len(faces), number_of_ffs, number_of_ffs*3 + len(faces), lod_0_count+1)
-                # print(ff_encountered, lod_0_count)
-                if LOD_ENABLED:
-                    if faces_file.name == '0236-1010':
-                        print(number_of_ffs)
-                        # if number_of_ffs*3 + len(faces) == lod_0_count[0]+1 or number_of_ffs > 0:
-                        #     print(number_of_ffs)
-                        #     return faces
+            if 'FFFFFFFF' in faces_hex:
+                faces_hex = faces_hex.split('FFFFFFFF')
+                int_faces_data = [[int(gf.get_flipped_hex(f[i:i + 8], 8), 16) + 1 for i in
+                                  range(0, len(f), 8)] for f in faces_hex]
+            else:
+                faces_hex = faces_hex.split('FFFF')
+                int_faces_data = [[int(gf.get_flipped_hex(f[i:i + 4], 4), 16) + 1 for i in
+                                   range(0, len(f), 4)] for f in faces_hex]
+            faces = []
+            for strip in int_faces_data:
+                j = 0
+                while True:
+                    if j+2 == len(strip):
+                        break
+                    if j % 2 == 0:
+                        faces.append(strip[j:j+3])
                     else:
-                        if number_of_ffs*3 + len(faces) == lod_0_count[0]+1:
-                            return faces
-                if i == len(int_faces_data) - 2:
-                    return faces
-                if j % 2 == 0:
-                    face = int_faces_data[i:i+3]
-                else:
-                    face = [int_faces_data[i+1], int_faces_data[i], int_faces_data[i+2]]
-                if 65536 in face:
-                    offset += 2
-                    number_of_ffs += 1
-                    j = 0
-                elif 4294967296 in face:
-                    offset += 4
-                    number_of_ffs += 1
-                    j = 0
-                else:
-                    # if number_of_ffs < 45000:
-                    #     j += 1
-                    #     continue
-                    faces.append(face)
+                        faces.append([strip[j+1], strip[j], strip[j+2]])
                     j += 1
+            return faces
         else:
+            int_faces_data = [int(gf.get_flipped_hex(faces_hex[i:i + 4], 4), 16) + 1 for i in
+                               range(0, len(faces_hex), 4)]
             if len(int_faces_data) % 3 != 0:
                 return None
             for i in range(0, len(int_faces_data), 3):
-                if LOD_ENABLED:
-                    if len(faces) == lod_0_count[1]*3:
-                        return faces
                 face = []
                 for j in range(3):
                     face.append(int_faces_data[i + j])
@@ -492,7 +513,7 @@ def get_obj_str(verts_data, faces_data, vts):
 
 
 def write_fbx(faces_data, verts_data, hsh, model_file, temp_direc):
-    controlpoints = [fbx.FbxVector4(-x[0], x[2], x[1]) for x in verts_data]
+    controlpoints = [fbx.FbxVector4(x[0], x[1], x[2]) for x in verts_data]
     # manager = Manager()
     # manager.create_scene(name)
     fb = pfb.Model()
@@ -504,9 +525,9 @@ def write_fbx(faces_data, verts_data, hsh, model_file, temp_direc):
         mesh.SetControlPointAt(p, i)
     for face in faces_data:
         mesh.BeginPolygon()
-        mesh.AddPolygon(face[0]-1)
-        mesh.AddPolygon(face[1]-1)
-        mesh.AddPolygon(face[2]-1)
+        mesh.AddPolygon(face[0])
+        mesh.AddPolygon(face[1])
+        mesh.AddPolygon(face[2])
         mesh.EndPolygon()
 
     node = fbx.FbxNode.Create(fb.scene, '')
@@ -632,34 +653,44 @@ def get_model(model_file, all_file_info, temp_direc=''):
     for i, pos_vert_file in enumerate(pos_verts_files):
         faces_file = faces_files[i]
         coords = get_verts_data(pos_vert_file, all_file_info, is_uv=False)
-        faces_data = get_faces_data(faces_file, all_file_info)
-        if not faces_data:
-            print('No faces data')
-            return
+        # faces_data = get_faces_data(faces_file, all_file_info)
+        # if not faces_data:
+        #     print('No faces data')
+        #     return
         if len(uv_verts_files) == len(pos_verts_files):
             uv_data = get_verts_data(uv_verts_files[i], all_file_info, is_uv=True)
         else:
             uv_data = []
-        if not coords or not faces_data:
-            print(f'{pos_vert_file.uid} not valid')
-            continue
+        # if not coords or not faces_data:
+        #     print(f'{pos_vert_file.uid} not valid')
+        #     continue
+
+        # count = 0
+        # new_faces = []
+        # for i, face in enumerate(faces_data):
+        #     if sorted(set(face)) != sorted(face):
+        #         count += 1
+        #     else:
+        #         if face not in new_faces:
+        #             new_faces.append(face)
+        #         else:
+        #             count += 1
+
+        # faces_data = new_faces
 
         # scaled_pos_verts = scale_verts(coords, model_file)
-        obj_str = get_obj_str(coords, faces_data, uv_data)
-        write_obj(obj_str, pos_vert_file.uid, model_file, temp_direc)
-        submeshes = get_submeshes(model_file, coords, faces_data)
+        # obj_str = get_obj_str(coords, faces_data, uv_data)
+        # write_obj(obj_str, pos_vert_file.uid, model_file, temp_direc)
+        face_hex = get_face_hex(faces_file, all_file_info)
+        submeshes = get_submeshes(model_file, coords, face_hex)
         max_vert_used = 0
         first_mat = None
         for submesh in submeshes:
             # break
             if not first_mat:
                 first_mat = submesh.material
-            # if first_mat != submesh.material:
-            #     break
-        # for i in range(8):
-        #     submesh = submeshes[i]
-            # submesh.faces, max_vert_used = adjust_faces_data(submesh.faces, max_vert_used)
-            # submesh.faces = shift_faces_down(submesh.faces)
+            if first_mat != submesh.material:
+                break
             if submesh.lod_level == 0:
                 write_submesh_fbx(submesh, temp_direc, model_file)
         # write_fbx(faces_data, coords, pos_vert_file.uid, model_file, temp_direc)
@@ -725,7 +756,9 @@ if __name__ == '__main__':
     # parent_file = '023A-1DE0'
     # parent_file = '0234-16B2'
     # parent_file = '03B8-047B'
-    parent_file = '0157-04AA'  # Moonfang Grips
+    # parent_file = '0157-04AA'  # Moonfang Grips
+    # parent_file = '0157-06A4'  # Moonfang rig
+    # parent_file = '0156-1E0A'  # Cinderpinion bios
     parent_file = '01B6-0C48'  # Wyvern
     # parent_file = '01BC-17FB'  # Vex harpy
     # parent_file = '0159-179A'
