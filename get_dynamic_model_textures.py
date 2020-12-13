@@ -330,7 +330,16 @@ class SubmeshEntry:
         self.FFFFFFFF = None
 
 
-def get_submeshes(file, pos_verts, face_hex):
+def trim_verts_data(verts_data, faces_data):
+    all_v = []
+    for face in faces_data:
+        for v in face:
+            all_v.append(v)
+    k = verts_data[min(all_v)-1:max(all_v)]
+    return verts_data[min(all_v)-1:max(all_v)]
+
+
+def get_submeshes(file, pos_verts, uv_verts, face_hex):
     # faces_ = faces
     # Getting the submesh table entries
     fbin = open(f'I:/d2_output_3_0_1_0/{gf.get_pkg_name(file)}/{file}.bin', 'rb').read()
@@ -352,27 +361,17 @@ def get_submeshes(file, pos_verts, face_hex):
     # Making submeshes
     submeshes = []
     for i, entry in enumerate(entries):
-        # if i != 0:
-        #     if entry.Material != entries[i-1].Material:
-        #         faces = faces_
         submesh = Submesh()
-        # submesh.faces = faces[entry.FaceOffset:entry.FaceOffset+entry.FaceCount]
-
-        # submesh.faces = faces[:entry.FaceCount]
-        # faces = faces[entry.FaceCount:]
         if 'FFFFFFFF' in face_hex:
             fhex = face_hex[entry.FaceOffset*8:entry.FaceOffset*8+entry.FaceCount*8]  # Doubled as not byte count but vert index count
         else:
             fhex = face_hex[entry.FaceOffset*4:entry.FaceOffset*4+entry.FaceCount*4]  # Doubled as not byte count but vert index count
 
-        submesh.faces = get_submesh_faces(fhex)
-        # faces = faces[entry.FaceCount:]
-
-        # verts_used = []
-        # [verts_used.extend(x) for x in faces]
-        # verts_used = list(set(verts_used))
-        # submesh.pos_verts = [pos_verts[i-1] for i in verts_used]
-        submesh.pos_verts = pos_verts
+        faces = get_submesh_faces(fhex)
+        submesh.pos_verts = trim_verts_data(pos_verts, faces)
+        submesh.uv_verts = trim_verts_data(uv_verts, faces)
+        alt = shift_faces_down(faces)
+        submesh.faces = alt
         submesh.name = f'{gf.get_hash_from_file(file)}_{i}_{len(submesh.faces)}'
         submesh.material = entry.Material
         submesh.lod_level = entry.LODLevel
@@ -393,10 +392,8 @@ def get_submeshes(file, pos_verts, face_hex):
 
 def write_submesh_fbx(submesh: Submesh, temp_direc, model_file):
     controlpoints = [fbx.FbxVector4(-x[0], x[2], x[1]) for x in submesh.pos_verts]
-    # manager = Manager()
-    # manager.create_scene(name)
-    fb = pfb.Model()
-    mesh = fbx.FbxMesh.Create(fb.scene, submesh.name)
+    model = pfb.Model()
+    mesh = fbx.FbxMesh.Create(model.scene, submesh.name)
 
     # for vert in verts_data:
         # fb.create_mesh_controlpoint(vert[0], vert[1], vert[2])
@@ -410,9 +407,9 @@ def write_submesh_fbx(submesh: Submesh, temp_direc, model_file):
         mesh.AddPolygon(face[2]-1)
         mesh.EndPolygon()
 
-    node = fbx.FbxNode.Create(fb.scene, submesh.name)
+    node = fbx.FbxNode.Create(model.scene, submesh.name)
     node.SetNodeAttribute(mesh)
-    fb.scene.GetRootNode().AddChild(node)
+    model.scene.GetRootNode().AddChild(node)
     if temp_direc or temp_direc != '':
         try:
             os.mkdir(f'I:/dynamic_models/{temp_direc}/')
@@ -424,6 +421,37 @@ def write_submesh_fbx(submesh: Submesh, temp_direc, model_file):
         pass
     fb.export(save_path=f'I:/dynamic_models/{temp_direc}/{model_file}/{submesh.name}.fbx', ascii_format=False)
     print(f'Written I:/dynamic_models/{temp_direc}/{model_file}/{submesh.name}.fbx.')
+
+
+def export_fbx(submeshes, model_file, name, temp_direc):
+    model = pfb.Model()
+    for submesh in submeshes:
+        mesh = create_mesh(model, submesh, name)
+        if not mesh.GetLayer(0):
+            mesh.CreateLayer()
+        layer = mesh.GetLayer(0)
+        # if shaders:
+        #     apply_shader(d2map, submesh, node)
+        # apply_diffuse(d2map, submesh, node)
+        create_uv(mesh, model_file, submesh, layer)
+        node = fbx.FbxNode.Create(model.scene, submesh.name)
+        node.SetNodeAttribute(mesh)
+        node.LclScaling.Set(fbx.FbxDouble3(100, 100, 100))
+        node.SetShadingMode(fbx.FbxNode.eTextureShading)
+        model.scene.GetRootNode().AddChild(node)
+
+
+    if temp_direc or temp_direc != '':
+        try:
+            os.mkdir(f'I:/dynamic_models/{temp_direc}/')
+        except:
+            pass
+    try:
+        os.mkdir(f'I:/dynamic_models/{temp_direc}/{model_file}')
+    except:
+        pass
+    model.export(save_path=f'I:/dynamic_models/{temp_direc}/{model_file}/{name}.fbx', ascii_format=False)
+    print(f'Written I:/dynamic_models/{temp_direc}/{model_file}/{name}.fbx.')
 
 
 def get_submesh_faces(faces_hex):
@@ -656,39 +684,13 @@ def get_model(model_file, all_file_info, temp_direc=''):
     #     return
     for i, pos_vert_file in enumerate(pos_verts_files):
         faces_file = faces_files[i]
-        coords = get_verts_data(pos_vert_file, all_file_info, is_uv=False)
-        # faces_data = get_faces_data(faces_file, all_file_info)
-        # if not faces_data:
-        #     print('No faces data')
-        #     return
-        if len(uv_verts_files) == len(pos_verts_files):
-            uv_data = get_verts_data(uv_verts_files[i], all_file_info, is_uv=True)
-        else:
-            uv_data = []
-        # if not coords or not faces_data:
-        #     print(f'{pos_vert_file.uid} not valid')
-        #     continue
-
-        # count = 0
-        # new_faces = []
-        # for i, face in enumerate(faces_data):
-        #     if sorted(set(face)) != sorted(face):
-        #         count += 1
-        #     else:
-        #         if face not in new_faces:
-        #             new_faces.append(face)
-        #         else:
-        #             count += 1
-
-        # faces_data = new_faces
-
+        pos_verts = get_verts_data(pos_vert_file, all_file_info, is_uv=False)
+        uv_verts = get_verts_data(uv_verts_files[i], all_file_info, is_uv=True)
         # scaled_pos_verts = scale_verts(coords, model_file)
-        # obj_str = get_obj_str(coords, faces_data, uv_data)
-        # write_obj(obj_str, pos_vert_file.uid, model_file, temp_direc)
         face_hex = get_face_hex(faces_file, all_file_info)
-        submeshes = get_submeshes(model_file, coords, face_hex)
-        max_vert_used = 0
+        submeshes = get_submeshes(model_file, pos_verts, uv_verts, face_hex)
         first_mat = None
+        submeshes_to_write = []
         for submesh in submeshes:
             # break
             if not first_mat:
@@ -696,7 +698,9 @@ def get_model(model_file, all_file_info, temp_direc=''):
             # if first_mat != submesh.material:
             #     break
             if submesh.lod_level == 0:
-                write_submesh_fbx(submesh, temp_direc, model_file)
+                submeshes_to_write.append(submesh)
+                # write_submesh_fbx(submesh, temp_direc, model_file)
+        export_fbx(submeshes_to_write, model_file, pos_vert_file.uid, temp_direc)
         # write_fbx(faces_data, coords, pos_vert_file.uid, model_file, temp_direc)
 
 
@@ -714,22 +718,34 @@ def scale_verts(verts_data, model_file):
     return verts_data
 
 
-# def create_mesh(d2map: Map, submesh: met.Submesh, name):
-#     mesh = fbx.FbxMesh.Create(d2map.fbx_model.scene, name)
-#     controlpoints = [fbx.FbxVector4(-x[0], x[2], x[1]) for x in submesh.pos_verts]
-#     for i, p in enumerate(controlpoints):
-#         mesh.SetControlPointAt(p, i)
-#     for face in submesh.faces:
-#         mesh.BeginPolygon()
-#         mesh.AddPolygon(face[0]-1)
-#         mesh.AddPolygon(face[1]-1)
-#         mesh.AddPolygon(face[2]-1)
-#         mesh.EndPolygon()
-#
-#     # node = fbx.FbxNode.Create(d2map.fbx_model.scene, name)
-#     # node.SetNodeAttribute(mesh)
-#
-#     return mesh
+def create_mesh(model, submesh: Submesh, name):
+    mesh = fbx.FbxMesh.Create(model.scene, name)
+    controlpoints = [fbx.FbxVector4(-x[0], x[2], x[1]) for x in submesh.pos_verts]
+    for i, p in enumerate(controlpoints):
+        mesh.SetControlPointAt(p, i)
+    for face in submesh.faces:
+        mesh.BeginPolygon()
+        mesh.AddPolygon(face[0]-1)
+        mesh.AddPolygon(face[1]-1)
+        mesh.AddPolygon(face[2]-1)
+        mesh.EndPolygon()
+
+    # node = fbx.FbxNode.Create(d2map.fbx_model.scene, name)
+    # node.SetNodeAttribute(mesh)
+
+    return mesh
+
+
+def create_uv(mesh, name, submesh: Submesh, layer):
+    uvDiffuseLayerElement = fbx.FbxLayerElementUV.Create(mesh, f'diffuseUV {name}')
+    uvDiffuseLayerElement.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
+    uvDiffuseLayerElement.SetReferenceMode(fbx.FbxLayerElement.eDirect)
+    # mesh.InitTextureUV()
+    for i, p in enumerate(submesh.uv_verts):
+        uvDiffuseLayerElement.GetDirectArray().Add(fbx.FbxVector2(p[0], p[1]))
+    layer.SetUVs(uvDiffuseLayerElement, fbx.FbxLayerElement.eTextureDiffuse)
+    return layer
+
 # #
 #
 # def create_uv(mesh, name, submesh: met.Submesh, layer):
