@@ -44,7 +44,7 @@ def get_pkg_name(file):
         print(f'{file} is invalid.')
         return None
     pkg_id = file.split('-')[0]
-    for folder in os.listdir('I:/d2_output_3_0_1_0/'):
+    for folder in os.listdir('I:/d2_output_3_0_1_2/'):
         if pkg_id.lower() in folder.lower():
             pkg_name = folder
             break
