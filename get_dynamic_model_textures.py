@@ -352,7 +352,6 @@ def trim_verts_data(verts_data, faces_data):
     for face in faces_data:
         for v in face:
             all_v.append(v)
-    k = verts_data[min(all_v)-1:max(all_v)]
     return verts_data[min(all_v)-1:max(all_v)]
 
 
@@ -405,7 +404,6 @@ def get_submeshes(file, pos_verts, uv_verts, face_hex):
                 continue
         faces = get_submesh_faces(submesh, face_hex)
         submesh.pos_verts = trim_verts_data(pos_verts, faces)
-        # submesh.pos_verts = pos_verts
         submesh.uv_verts = trim_verts_data(uv_verts, faces)
         alt = shift_faces_down(faces)
         submesh.faces = alt
@@ -414,8 +412,36 @@ def get_submeshes(file, pos_verts, uv_verts, face_hex):
     return submeshes
 
 
+def scale_and_repos_pos_verts(verts_data, fbin):
+    scale = struct.unpack('f', fbin[108:108 + 4])[0]
+    for i in range(len(verts_data)):
+        for j in range(3):
+            verts_data[i][j] *= scale
+
+    position_shift = [struct.unpack('f', fbin[96 + 4 * i:96 + 4 * (i + 1)])[0] for i in range(3)]
+    for i in range(3):
+        for j in range(len(verts_data)):
+            verts_data[j][i] -= (scale - position_shift[i])
+    return verts_data
+
+
+def scale_and_repos_uv_verts(verts_data, fbin):
+    # return verts_data
+    scales = [struct.unpack('f', fbin[112+i*4:112+(i+1)*4])[0] for i in range(2)]
+    position_shifts = [struct.unpack('f', fbin[120+i*4:120+(i+1)*4])[0] for i in range(2)]
+    for i in range(len(verts_data)):
+        verts_data[i][0] *= scales[0]
+        verts_data[i][1] *= -scales[1]
+
+    for j in range(len(verts_data)):
+        verts_data[j][0] -= (scales[0] - position_shifts[0])
+        verts_data[j][1] += (scales[1] - position_shifts[1] + 1)
+    return verts_data
+
+
 def export_fbx(submeshes, model_file, name, temp_direc):
     model = pfb.Model()
+    fbin = open(f'I:/d2_output_3_0_1_2/{gf.get_pkg_name(model_file)}/{model_file}.bin', 'rb').read()
     for submesh in submeshes:
         mesh = create_mesh(model, submesh, name)
         if not mesh.GetLayer(0):
@@ -505,54 +531,54 @@ def get_obj_str(verts_data, faces_data, vts):
     return verts_str + faces_str
 
 
-def write_fbx(faces_data, verts_data, hsh, model_file, temp_direc):
-    controlpoints = [fbx.FbxVector4(x[0], x[1], x[2]) for x in verts_data]
-    # manager = Manager()
-    # manager.create_scene(name)
-    fb = pfb.Model()
-    mesh = fbx.FbxMesh.Create(fb.scene, hsh)
-
-    # for vert in verts_data:
-        # fb.create_mesh_controlpoint(vert[0], vert[1], vert[2])
-    for i, p in enumerate(controlpoints):
-        mesh.SetControlPointAt(p, i)
-    for face in faces_data:
-        mesh.BeginPolygon()
-        mesh.AddPolygon(face[0])
-        mesh.AddPolygon(face[1])
-        mesh.AddPolygon(face[2])
-        mesh.EndPolygon()
-
-    node = fbx.FbxNode.Create(fb.scene, '')
-    node.SetNodeAttribute(mesh)
-    fb.scene.GetRootNode().AddChild(node)
-    if temp_direc or temp_direc != '':
-        try:
-            os.mkdir(f'I:/dynamic_models/{temp_direc}/')
-        except:
-            pass
-    try:
-        os.mkdir(f'I:/dynamic_models/{temp_direc}/{model_file}')
-    except:
-        pass
-    fb.export(save_path=f'I:/dynamic_models/{temp_direc}/{model_file}/{hsh}.fbx', ascii_format=False)
-    print(f'Written I:/dynamic_models/{temp_direc}/{model_file}/{hsh}.fbx.')
-
-
-def write_obj(obj_strings, hsh, model_file, temp_direc):
-    # return
-    if temp_direc or temp_direc != '':
-        try:
-            os.mkdir(f'I:/dynamic_models/{temp_direc}/')
-        except:
-            pass
-    try:
-        os.mkdir(f'I:/dynamic_models/{temp_direc}/{model_file}')
-    except:
-        pass
-    with open(f'I:/dynamic_models/{temp_direc}/{model_file}/{hsh}.obj', 'w') as f:
-        f.write(obj_strings)
-    print(f'Written {temp_direc}/{model_file}/{hsh} to obj.')
+    # def write_fbx(faces_data, verts_data, hsh, model_file, temp_direc):
+    #     controlpoints = [fbx.FbxVector4(x[0], x[1], x[2]) for x in verts_data]
+    #     # manager = Manager()
+    #     # manager.create_scene(name)
+    #     fb = pfb.Model()
+    #     mesh = fbx.FbxMesh.Create(fb.scene, hsh)
+    #
+    #     # for vert in verts_data:
+    #         # fb.create_mesh_controlpoint(vert[0], vert[1], vert[2])
+    #     for i, p in enumerate(controlpoints):
+    #         mesh.SetControlPointAt(p, i)
+    #     for face in faces_data:
+    #         mesh.BeginPolygon()
+    #         mesh.AddPolygon(face[0])
+    #         mesh.AddPolygon(face[1])
+    #         mesh.AddPolygon(face[2])
+    #         mesh.EndPolygon()
+    #
+    #     node = fbx.FbxNode.Create(fb.scene, '')
+    #     node.SetNodeAttribute(mesh)
+    #     fb.scene.GetRootNode().AddChild(node)
+    #     if temp_direc or temp_direc != '':
+    #         try:
+    #             os.mkdir(f'I:/dynamic_models/{temp_direc}/')
+    #         except:
+    #             pass
+    #     try:
+    #         os.mkdir(f'I:/dynamic_models/{temp_direc}/{model_file}')
+    #     except:
+    #         pass
+    #     fb.export(save_path=f'I:/dynamic_models/{temp_direc}/{model_file}/{hsh}.fbx', ascii_format=False)
+    #     print(f'Written I:/dynamic_models/{temp_direc}/{model_file}/{hsh}.fbx.')
+    #
+    #
+    # def write_obj(obj_strings, hsh, model_file, temp_direc):
+    #     # return
+    #     if temp_direc or temp_direc != '':
+    #         try:
+    #             os.mkdir(f'I:/dynamic_models/{temp_direc}/')
+    #         except:
+    #             pass
+    #     try:
+    #         os.mkdir(f'I:/dynamic_models/{temp_direc}/{model_file}')
+    #     except:
+    #         pass
+    #     with open(f'I:/dynamic_models/{temp_direc}/{model_file}/{hsh}.obj', 'w') as f:
+    #         f.write(obj_strings)
+    #     print(f'Written {temp_direc}/{model_file}/{hsh} to obj.')
 
 
 def get_verts_faces_files(model_file):
@@ -643,10 +669,13 @@ def get_model(model_file, all_file_info, lod, temp_direc=''):
     # lod_0_faces = get_lod_0_faces(model_file, len(pos_verts_files))
     # if not lod_0_faces:
     #     return
+    fbin = open(f'I:/d2_output_3_0_1_2/{gf.get_pkg_name(model_file)}/{model_file}.bin', 'rb').read()
     for i, pos_vert_file in enumerate(pos_verts_files):
         faces_file = faces_files[i]
         pos_verts = get_verts_data(pos_vert_file, all_file_info, is_uv=False)
+        pos_verts = scale_and_repos_pos_verts(pos_verts, fbin)
         uv_verts = get_verts_data(uv_verts_files[i], all_file_info, is_uv=True)
+        uv_verts = scale_and_repos_uv_verts(uv_verts, fbin)
         # scaled_pos_verts = scale_verts(coords, model_file)
         face_hex = get_face_hex(faces_file, all_file_info)
         submeshes = get_submeshes(model_file, pos_verts, uv_verts, face_hex)
@@ -667,18 +696,18 @@ def get_model(model_file, all_file_info, lod, temp_direc=''):
             export_fbx(submeshes, model_file, pos_vert_file.uid, temp_direc)
 
 
-def scale_verts(verts_data, model_file):
-    return verts_data
-    pkg_name = gf.get_pkg_name(model_file)
-    model_hex = gf.get_hex_data(f'{test_dir}/{pkg_name}/{model_file}.bin')
-    # TODO fix this, this isn't correct but it is needed.
-    model_scale = [struct.unpack('f', bytes.fromhex(model_hex[j:j + 8]))[0] for j in range(0x70*2, (0x70+12)*2, 8)]
-
-    for i in range(len(verts_data)):
-        for j in range(3):
-            verts_data[i][j] *= model_scale[j]
-
-    return verts_data
+# def scale_verts(verts_data, model_file):
+#     return verts_data
+#     pkg_name = gf.get_pkg_name(model_file)
+#     model_hex = gf.get_hex_data(f'{test_dir}/{pkg_name}/{model_file}.bin')
+#     # TODO fix this, this isn't correct but it is needed.
+#     model_scale = [struct.unpack('f', bytes.fromhex(model_hex[j:j + 8]))[0] for j in range(0x70*2, (0x70+12)*2, 8)]
+#
+#     for i in range(len(verts_data)):
+#         for j in range(3):
+#             verts_data[i][j] *= model_scale[j]
+#
+#     return verts_data
 
 
 def create_mesh(model, submesh: Submesh, name):
@@ -722,13 +751,13 @@ def create_uv(mesh, name, submesh: Submesh, layer):
 #     return layer
 
 
-def export_all_models(pkg_name, all_file_info, lod):
+def export_all_models(pkg_name, all_file_info, select, lod):
     entries_type = {x: y for x, y in pkg_db.get_entries_from_table(pkg_name, 'FileName, FileType') if y == 'Dynamic Model Header 3'}
     for file in list(entries_type.keys()):
         if file == '01B5-1666':
             a = 0
         print(f'Getting file {file}')
-        get_model(file, all_file_info, lod, temp_direc='cinematics/' + pkg_name)
+        get_model(file, all_file_info, lod, temp_direc=f'{select}/' + pkg_name)
 
 
 if __name__ == '__main__':
@@ -745,7 +774,7 @@ if __name__ == '__main__':
     # parent_file = '01B6-0C48'  # Wyvern
     # parent_file = '0148-08A0'  # Uldren cinematic
     # parent_file = '01BC-17FB'  # Vex harpy
-    parent_file = '0148-0AE6'
+    parent_file = '0148-0AD6'
     # parent_file = gf.get_file_from_hash('17B8B580')
     # get_model(parent_file, all_file_info)
     # parent_file = '0361-0012'
@@ -754,9 +783,10 @@ if __name__ == '__main__':
     # parent_file = get_file_from_hash(get_flipped_hex('1A20EC80', 8))
     # print(parent_file)
     # parent_file = '0378-03E5'
-    get_model(parent_file, all_file_info, lod=True)
-    quit()
+    # get_model(parent_file, all_file_info, lod=True)
+    # quit()
+    select = 'gear'
     for pkg in pkg_db.get_all_tables():
-        if 'cinematics' in pkg:
+        if select in pkg:
             # if pkg not in os.listdir('C:/d2_model_temp/texture_models/tower'):
-                export_all_models(pkg, all_file_info, lod=True)
+                export_all_models(pkg, all_file_info, select, lod=True)
