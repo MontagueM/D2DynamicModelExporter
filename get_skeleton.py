@@ -71,15 +71,33 @@ def get_skeleton(file):
     return nodes
 
 
-def test_export(file, nodes):
-    with open(f'test_skel/{file}.obj', 'w') as f:
+def test_export(file, nodes, name):
+    with open(f'I:/skeletons/{file}_{name}.obj', 'w') as f:
         f.write(f'o {file}\n')
         for n in nodes:
-            f.write(f'v {n.dost.location[0]} {n.dost.location[1]} {n.dost.location[2]}\n')
-    print(f'Test export complete for {file}')
+            f.write(f'v {-n.dost.location[0]} {n.dost.location[2]} {n.dost.location[1]}\n')
+    print(f'Test export complete for {file}_{name}')
+
+
+def write_info_out(file, nodes, name):
+    with open(f'I:/skeletons/{file}_{name}.info', 'w') as f:
+        for i, n in enumerate(nodes):
+            f.write(f'Node {i}:\n')
+            f.write(f'hash {n.hash}\n')
+            f.write(f'first_child_node_index {n.first_child_node_index}\n')
+            f.write(f'next_sibling_node_index {n.next_sibling_node_index}\n')
+            f.write(f'parent_node_index {n.parent_node_index}\n')
+            f.write(f'default_inverse_object_space_transforms loc {n.diost.location}\n')
+            f.write(f'default_inverse_object_space_transforms rot {n.diost.rotation}\n')
+            f.write(f'default_object_space_transforms loc {n.dost.location}\n')
+            f.write(f'default_object_space_transforms loc {n.dost.rotation}\n\n')
+    print(f'Info export complete for {file}_{name}')
+
 
 
 if __name__ == '__main__':
-    skeleton_file = '0148-0982'
+    skeleton_file = '0158-0190'
     nodes = get_skeleton(skeleton_file)
-    test_export(skeleton_file, nodes)
+    name = 'taniks_reborn'
+    test_export(skeleton_file, nodes, name)
+    write_info_out(skeleton_file, nodes, name)
