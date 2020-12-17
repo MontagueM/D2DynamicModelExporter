@@ -58,7 +58,7 @@ def get_header(file_hex, header):
     return header
 
 
-test_dir = 'I:/d2_output_3_0_1_2'
+test_dir = 'I:/d2_output_3_0_1_3'
 
 
 # def get_referenced_file(file):
@@ -154,7 +154,7 @@ def get_verts_data(verts_file, all_file_info, is_uv):
     elif stride_header.StrideLength == 40:
         """
         """
-        return None
+        # return None
         coords = get_coords_40(hex_data_split)
     elif stride_header.StrideLength == 48:
         """
@@ -262,7 +262,6 @@ def get_coords_28(hex_data_split):
 def get_coords_32(hex_data_split):
     coords = []
     for hex_data in hex_data_split:
-        hex_data = hex_data[40:]
         coord = []
         for j in range(3):
             flt = get_float16(hex_data, j, is_uv=False)
@@ -355,16 +354,18 @@ def trim_verts_data(verts_data, faces_data):
     return verts_data[min(all_v)-1:max(all_v)]
 
 
-def get_submeshes(file, pos_verts, uv_verts, face_hex):
+def get_submeshes(file, index, pos_verts, uv_verts, face_hex):
     # faces_ = faces
     # Getting the submesh table entries
-    fbin = open(f'I:/d2_output_3_0_1_2/{gf.get_pkg_name(file)}/{file}.bin', 'rb').read()
-    offset = fbin.find(b'\xCB\x6E\x80\x80')
+    fbin = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(file)}/{file}.bin', 'rb').read()
+    # offset = fbin.find(b'\xCB\x6E\x80\x80')
+    offset = [m.start() for m in re.finditer(b'\xCB\x6E\x80\x80', fbin)][index]
     if offset == -1:
         raise Exception('File contains no submeshes')
     entry_count = gf.get_uint32(fbin, offset-8)
     entries = []
     offset += 8
+    stride = 4
     for i in range(offset, offset+0x24*entry_count, 0x24):
         entry = SubmeshEntryProper()
         entry.Material = fbin[i:i+4]
@@ -373,22 +374,25 @@ def get_submeshes(file, pos_verts, uv_verts, face_hex):
         entry.IndexCount = gf.get_uint32(fbin, i+0xC)
         entry.EndFaceCount = gf.get_uint32(fbin, i+0x10)
         entry.Flags = gf.get_uint32(fbin, i+0x18)
-        if entry.Flags & 0x8 != 0:
-            print('Model using alpha test')
+        # if entry.Flags & 0x8 != 0:
+        #     print('Model using alpha test')
         entry.LODLevel = fbin[i+0x1B]
         entries.append(entry)
+
+        if entry.IndexOffset+entry.IndexCount > 65535:
+            stride = 8
 
     # Making submeshes
     submeshes = []
     for i, entry in enumerate(entries):
         submesh = Submesh()
-        if 'FFFFFFFF' in face_hex:
-            submesh.stride = 8
-        elif 'FFFF' in face_hex or len(face_hex) % 3 != 0:
-            submesh.stride = 4
+        # if 'FFFFFFFF' or '00000000' in face_hex:
+        #     submesh.stride = 8
+        # elif 'FFFF' in face_hex or '0000' in face_hex:
+        #     submesh.stride = 4
         submesh.entry = entry
-        submesh.name = f'{gf.get_hash_from_file(file)}_{i}_{len(submesh.faces)}'
-        submesh.material = entry.Material
+        submesh.name = f'{gf.get_hash_from_file(file)}_{i}_{submesh.lod_level}'
+        submesh.material = binascii.hexlify(entry.Material).decode().upper()
         submesh.type = entry.PrimitiveType
         submesh.lod_level = entry.LODLevel
 
@@ -402,9 +406,12 @@ def get_submeshes(file, pos_verts, uv_verts, face_hex):
             if submesh.lod_level >= existing[submesh.entry.IndexOffset]:
                 submeshes.remove(submesh)
                 continue
-        faces = get_submesh_faces(submesh, face_hex)
+        faces = get_submesh_faces(submesh, face_hex, stride)
         submesh.pos_verts = trim_verts_data(pos_verts, faces)
-        submesh.uv_verts = trim_verts_data(uv_verts, faces)
+        if uv_verts:
+            submesh.uv_verts = trim_verts_data(uv_verts, faces)
+        else:
+            submesh.uv_verts = uv_verts
         alt = shift_faces_down(faces)
         submesh.faces = alt
         existing[submesh.entry.IndexOffset] = submesh.lod_level
@@ -441,7 +448,7 @@ def scale_and_repos_uv_verts(verts_data, fbin):
 
 def export_fbx(submeshes, model_file, name, temp_direc):
     model = pfb.Model()
-    fbin = open(f'I:/d2_output_3_0_1_2/{gf.get_pkg_name(model_file)}/{model_file}.bin', 'rb').read()
+    fbin = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(model_file)}/{model_file}.bin', 'rb').read()
     for submesh in submeshes:
         mesh = create_mesh(model, submesh, name)
         if not mesh.GetLayer(0):
@@ -450,7 +457,8 @@ def export_fbx(submeshes, model_file, name, temp_direc):
         # if shaders:
         #     apply_shader(d2map, submesh, node)
         # apply_diffuse(d2map, submesh, node)
-        create_uv(mesh, model_file, submesh, layer)
+        if submesh.uv_verts:
+            create_uv(mesh, model_file, submesh, layer)
         node = fbx.FbxNode.Create(model.scene, submesh.name)
         node.SetNodeAttribute(mesh)
         node.LclScaling.Set(fbx.FbxDouble3(100, 100, 100))
@@ -471,12 +479,12 @@ def export_fbx(submeshes, model_file, name, temp_direc):
     print(f'Written I:/dynamic_models/{temp_direc}/{model_file}/{name}.fbx.')
 
 
-def get_submesh_faces(submesh: Submesh, faces_hex):
+def get_submesh_faces(submesh: Submesh, faces_hex, stride):
     # 3 is triangles, 5 is triangle strip
     increment = 3
     start = submesh.entry.IndexOffset
     count = submesh.entry.IndexCount
-    if submesh.stride == 8:
+    if stride == 8:
         int_faces_data = [int(gf.get_flipped_hex(faces_hex[i:i + 8], 8), 16) + 1 for i in
                            range(0, len(faces_hex), 8)]
     else:
@@ -594,7 +602,7 @@ def get_verts_faces_files(model_file):
     # Always at [400, 672, 944, 1216, 1488, ...]
     num = int(gf.get_flipped_hex(model_data_hex[176*2:180*2], 8), 16)
     for i in range(num):
-        rel_hex = model_data_hex[192*2+136*2*i:192*2+136*2*(i+1)]
+        rel_hex = model_data_hex[192*2+128*2*i:192*2+128*2*(i+1)]
         for j in range(0, len(rel_hex), 8):
             hsh = rel_hex[j:j+8]
             if hsh != 'FFFFFFFF':
@@ -669,16 +677,19 @@ def get_model(model_file, all_file_info, lod, temp_direc=''):
     # lod_0_faces = get_lod_0_faces(model_file, len(pos_verts_files))
     # if not lod_0_faces:
     #     return
-    fbin = open(f'I:/d2_output_3_0_1_2/{gf.get_pkg_name(model_file)}/{model_file}.bin', 'rb').read()
+    fbin = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(model_file)}/{model_file}.bin', 'rb').read()
     for i, pos_vert_file in enumerate(pos_verts_files):
         faces_file = faces_files[i]
         pos_verts = get_verts_data(pos_vert_file, all_file_info, is_uv=False)
         pos_verts = scale_and_repos_pos_verts(pos_verts, fbin)
-        uv_verts = get_verts_data(uv_verts_files[i], all_file_info, is_uv=True)
-        uv_verts = scale_and_repos_uv_verts(uv_verts, fbin)
+        if i < len(uv_verts_files):
+            uv_verts = get_verts_data(uv_verts_files[i], all_file_info, is_uv=True)
+            uv_verts = scale_and_repos_uv_verts(uv_verts, fbin)
+        else:
+            uv_verts = []
         # scaled_pos_verts = scale_verts(coords, model_file)
         face_hex = get_face_hex(faces_file, all_file_info)
-        submeshes = get_submeshes(model_file, pos_verts, uv_verts, face_hex)
+        submeshes = get_submeshes(model_file, i, pos_verts, uv_verts, face_hex)
         first_mat = None
         submeshes_to_write = []
         for submesh in submeshes:
@@ -687,9 +698,12 @@ def get_model(model_file, all_file_info, lod, temp_direc=''):
                 first_mat = submesh.material
             # if first_mat != submesh.material:
             #     break
-            if submesh.lod_level == 0:
+            if any([x.lod_level == 0 for x in submeshes]):
+                if submesh.lod_level == 0:
+                    submeshes_to_write.append(submesh)
+                    # write_submesh_fbx(submesh, temp_direc, model_file)
+            else:
                 submeshes_to_write.append(submesh)
-                # write_submesh_fbx(submesh, temp_direc, model_file)
         if lod:
             export_fbx(submeshes_to_write, model_file, pos_vert_file.uid, temp_direc)
         else:
@@ -761,20 +775,20 @@ def export_all_models(pkg_name, all_file_info, select, lod):
 
 
 if __name__ == '__main__':
-    pkg_db.start_db_connection('3_0_1_2')
+    pkg_db.start_db_connection('3_0_1_3')
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
     # RefID 0x13A5, RefPKG 0x0003
     # parent_file = '023A-1DE0'
     # parent_file = '0234-16B2'
     # parent_file = '03B8-047B'
-    parent_file = '0157-04AA'  # Moonfang Grips
+    # parent_file = '0157-04AA'  # Moonfang Grips
     # parent_file = '0157-06A4'  # Moonfang rig
     # parent_file = '0156-1E0A'  # Cinderpinion bios
-    # parent_file = '01B6-0C48'  # Wyvern
+    parent_file = '01B6-0C48'  # Wyvern
     # parent_file = '0148-08A0'  # Uldren cinematic
     # parent_file = '01BC-17FB'  # Vex harpy
-    parent_file = '0148-0AD6'
+    parent_file = '01E5-11A3'
     # parent_file = gf.get_file_from_hash('17B8B580')
     # get_model(parent_file, all_file_info)
     # parent_file = '0361-0012'
@@ -783,10 +797,13 @@ if __name__ == '__main__':
     # parent_file = get_file_from_hash(get_flipped_hex('1A20EC80', 8))
     # print(parent_file)
     # parent_file = '0378-03E5'
-    # get_model(parent_file, all_file_info, lod=True)
-    # quit()
-    select = 'gear'
+    get_model(parent_file, all_file_info, lod=True)
+    quit()
+    select = 'environments'
+    folder = select
+    # folder = 'gambit'
+    gf.mkdir(f'I:/dynamic_models/{folder}')
     for pkg in pkg_db.get_all_tables():
         if select in pkg:
             # if pkg not in os.listdir('C:/d2_model_temp/texture_models/tower'):
-                export_all_models(pkg, all_file_info, select, lod=True)
+                export_all_models(pkg, all_file_info, folder, lod=True)

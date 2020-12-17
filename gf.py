@@ -44,7 +44,7 @@ def get_pkg_name(file):
         print(f'{file} is invalid.')
         return None
     pkg_id = file.split('-')[0]
-    for folder in os.listdir('I:/d2_output_3_0_1_2/'):
+    for folder in os.listdir('I:/d2_output_3_0_1_3/'):
         if pkg_id.lower() in folder.lower():
             pkg_name = folder
             break
@@ -69,3 +69,9 @@ def get_int32(hx, offset):
 def get_int16(hx, offset):
     return int.from_bytes(hx[offset:offset+2], byteorder='little', signed=True)
 
+
+def mkdir(path):
+    try:
+        os.mkdir(path)
+    except FileExistsError:
+        pass
