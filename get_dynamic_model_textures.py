@@ -366,6 +366,7 @@ def get_submeshes(file, index, pos_verts, uv_verts, face_hex):
     entries = []
     offset += 8
     stride = 4
+
     for i in range(offset, offset+0x24*entry_count, 0x24):
         entry = SubmeshEntryProper()
         entry.Material = fbin[i:i+4]
@@ -379,8 +380,9 @@ def get_submeshes(file, index, pos_verts, uv_verts, face_hex):
         entry.LODLevel = fbin[i+0x1B]
         entries.append(entry)
 
-        if entry.IndexOffset+entry.IndexCount > 65535:
-            stride = 8
+    if len(pos_verts) > 65535:
+        stride = 8
+
 
     # Making submeshes
     submeshes = []
@@ -480,6 +482,8 @@ def export_fbx(submeshes, model_file, name, temp_direc):
 
 
 def get_submesh_faces(submesh: Submesh, faces_hex, stride):
+    # if submesh.name == '80bc5114_1_0':
+    #     a = 0
     # 3 is triangles, 5 is triangle strip
     increment = 3
     start = submesh.entry.IndexOffset
@@ -508,6 +512,8 @@ def get_submesh_faces(submesh: Submesh, faces_hex, stride):
         else:
             # face = int_faces_data[face_index:face_index+3][::-1]
             face = [int_faces_data[face_index+1], int_faces_data[face_index+0], int_faces_data[face_index+2]]
+        if face == []:
+            a = 0
         faces.append(face)
         j += 1
     return faces
@@ -768,8 +774,8 @@ def create_uv(mesh, name, submesh: Submesh, layer):
 def export_all_models(pkg_name, all_file_info, select, lod):
     entries_type = {x: y for x, y in pkg_db.get_entries_from_table(pkg_name, 'FileName, FileType') if y == 'Dynamic Model Header 3'}
     for file in list(entries_type.keys()):
-        if file == '01B5-1666':
-            a = 0
+        # if file == '01B5-1666':
+        #     a = 0
         print(f'Getting file {file}')
         get_model(file, all_file_info, lod, temp_direc=f'{select}/' + pkg_name)
 
@@ -788,7 +794,9 @@ if __name__ == '__main__':
     parent_file = '01B6-0C48'  # Wyvern
     # parent_file = '0148-08A0'  # Uldren cinematic
     # parent_file = '01BC-17FB'  # Vex harpy
-    parent_file = '01E5-11A3'
+    parent_file = '01E2-1347'  # type 3 stride 4
+    parent_file = '01E2-1335'  # type 3 stride 8
+    parent_file = '01E2-0637'  #
     # parent_file = gf.get_file_from_hash('17B8B580')
     # get_model(parent_file, all_file_info)
     # parent_file = '0361-0012'
@@ -797,8 +805,8 @@ if __name__ == '__main__':
     # parent_file = get_file_from_hash(get_flipped_hex('1A20EC80', 8))
     # print(parent_file)
     # parent_file = '0378-03E5'
-    get_model(parent_file, all_file_info, lod=True)
-    quit()
+    # get_model(parent_file, all_file_info, lod=True)
+    # quit()
     select = 'environments'
     folder = select
     # folder = 'gambit'
