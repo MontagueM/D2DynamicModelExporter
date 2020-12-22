@@ -1,6 +1,10 @@
 import gf
 import struct
-
+import fbx
+import pyfbx_jo as pfb
+import FbxCommon
+import scipy.spatial
+import numpy as np
 
 class Node:
     def __init__(self):
@@ -8,8 +12,9 @@ class Node:
         self.parent_node_index = 0
         self.first_child_node_index = 0
         self.next_sibling_node_index = 0
-        self.dost = DefaultObjectSpaceTransform
-        self.diost = DefaultInverseObjectSpaceTransform
+        self.dost = DefaultObjectSpaceTransform()
+        self.diost = DefaultInverseObjectSpaceTransform()
+        self.fbxnode = None
 
 
 class DefaultObjectSpaceTransform:
@@ -24,13 +29,13 @@ class DefaultInverseObjectSpaceTransform(DefaultObjectSpaceTransform):
         super(DefaultInverseObjectSpaceTransform, self).__init__()
 
 
-def get_skeleton(file):
+def get_skeleton(file, names):
     """
     Using sequential pathing for ease.
     default_object_space_transforms is dost
     default_inverse_object_space_transforms is diost
     """
-    fbin = open(f'I:/d2_output_3_0_1_0/{gf.get_pkg_name(file)}/{file}.bin', 'rb').read()
+    fbin = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(file)}/{file}.bin', 'rb').read()
     offset = fbin.find(b'\x42\x86\x80\x80') - 0x88
     if offset == -0x89:
         raise Exception('Not valid file')
@@ -46,7 +51,11 @@ def get_skeleton(file):
     # node definitions
     for i in range(nodes_offset, nodes_offset+0x10*nodes_size, 0x10):
         node = Node()
-        node.hash = gf.get_uint32(fbin, i)
+        node.hash = str(gf.get_uint32(fbin, i))
+        if node.hash in names:
+            node.name = names[node.hash]
+        else:
+            node.name = 'unk_' + node.hash
         node.parent_node_index = gf.get_int32(fbin, i+0x4)
         node.first_child_node_index = gf.get_int32(fbin, i+0x8)
         node.next_sibling_node_index = gf.get_int32(fbin, i+0xC)
@@ -83,21 +92,114 @@ def write_info_out(file, nodes, name):
     with open(f'I:/skeletons/{file}_{name}.info', 'w') as f:
         for i, n in enumerate(nodes):
             f.write(f'Node {i}:\n')
+            f.write(f'name {n.name}\n')
             f.write(f'hash {n.hash}\n')
             f.write(f'first_child_node_index {n.first_child_node_index}\n')
             f.write(f'next_sibling_node_index {n.next_sibling_node_index}\n')
             f.write(f'parent_node_index {n.parent_node_index}\n')
-            f.write(f'default_inverse_object_space_transforms loc {n.diost.location}\n')
-            f.write(f'default_inverse_object_space_transforms rot {n.diost.rotation}\n')
+            # f.write(f'default_inverse_object_space_transforms loc {n.diost.location}\n')
+            # f.write(f'default_inverse_object_space_transforms rot {n.diost.rotation} {scipy.spatial.transform.Rotation.from_quat(node.dost.rotation).as_euler('xyz', degrees=True)\n')
+            # f.write(f'default_inverse_object_space_transforms scale {n.diost.scale}\n')
             f.write(f'default_object_space_transforms loc {n.dost.location}\n')
-            f.write(f'default_object_space_transforms loc {n.dost.rotation}\n\n')
+            f.write(f'default_object_space_transforms rot {scipy.spatial.transform.Rotation.from_quat(n.dost.rotation).as_euler("xyz", degrees=True)} {n.dost.rotation}\n')
+            f.write(f'default_object_space_transforms scale {n.diost.scale}\n\n')
     print(f'Info export complete for {file}_{name}')
 
 
+def get_skeleton_names():
+    names = {}
+    with open ('bone_names.json') as f:
+        f = f.readlines()
+        for l in f:
+            s = l.split(',')
+            names[s[0]] = s[1].strip()
+    return names
+
+
+def write_fbx_skeleton(file, nodes, name):
+    lSdkManager, lScene = FbxCommon.InitializeSdkObjects()
+    # Adding proper fbx nodes
+    for node in nodes:
+        nodeatt = fbx.FbxSkeleton.Create(lSdkManager, node.name)
+        if node.parent_node_index == -1:  # At root
+            nodeatt.SetSkeletonType(fbx.FbxSkeleton.eRoot)
+        elif node.first_child_node_index == -1:  # At end
+            nodeatt.SetSkeletonType(fbx.FbxSkeleton.eLimbNode)
+        else:  # In the middle somewhere
+            nodeatt.SetSkeletonType(fbx.FbxSkeleton.eLimbNode)
+        nodeatt.Size.Set(node.dost.scale)
+        node.fbxnode = fbx.FbxNode.Create(lSdkManager, node.name)
+        node.fbxnode.SetNodeAttribute(nodeatt)
+
+        r = scipy.spatial.transform.Rotation.from_quat(node.dost.rotation).as_euler('xyz', degrees=True)
+        rot = r
+        if node.parent_node_index > 0:
+            n = scipy.spatial.transform.Rotation.from_quat(nodes[node.parent_node_index].dost.rotation).as_euler('xyz', degrees=True)
+            k = scipy.spatial.transform.Rotation.from_quat(nodes[node.parent_node_index].dost.rotation)
+            rot = [r[i] - n[i] for i in range(3)]
+            # rot = scipy.spatial.transform.Rotation.apply(k, rot, inverse=False)
+
+        node.fbxnode.SetTransformationInheritType(fbx.FbxTransform.eInheritRrs)
+        if node.parent_node_index != -1:  # Checking to see if rotation is inherited
+            a = 0
+            node.fbxnode.LclRotation.Set(fbx.FbxDouble3(rot[0], rot[1], rot[2]))
+
+        if node.parent_node_index != -1:
+            n = scipy.spatial.transform.Rotation.from_quat(nodes[node.parent_node_index].dost.rotation)
+            # Fix for inherited translation
+            loc = [node.dost.location[i] - nodes[node.parent_node_index].dost.location[i] for i in range(3)]
+            loc = scipy.spatial.transform.Rotation.apply(n, loc, inverse=False)
+        else:
+            loc = node.dost.location
+        node.fbxnode.LclTranslation.Set(fbx.FbxDouble3(loc[0], loc[1], loc[2]))
+
+    # Building heirachy
+    root = None
+    for i, node in enumerate(nodes):
+        want = [
+            'b_pedestal',
+            'b_pelvis',
+            'b_spine_1',
+            'b_spine_2',
+            'b_spine_3',
+            'b_l_clav',
+            'b_r_clav',
+            'b_neck_1',
+            'b_neck_2'
+        ]
+        # if i > 10:
+        #     break
+        # we want the spine to be perfectly straight. When it is, it's likely the rotation is correct.
+        # if node.name not in want:
+        #     continue
+
+        """
+        Notes:
+        - looks like incorrect axis of rotation being used for some bits
+        """
+
+        if node.parent_node_index != -1:
+            nodes[node.parent_node_index].fbxnode.AddChild(node.fbxnode)
+            print(f'{nodes[node.parent_node_index].hash} has child {node.hash}')
+        else:
+            root = node
+
+    if root:
+        lScene.GetRootNode().AddChild(root.fbxnode)
+        # lScene.GetRootNode().SetRotationActive(True)
+        # lScene.GetRootNode().LclRotation(fbx.FbxDouble3(-90, 180, 0))
+        lResult = FbxCommon.SaveScene(lSdkManager, lScene, f'I:/skeletons/{file}_{name}.fbx')
+
 
 if __name__ == '__main__':
-    skeleton_file = '0158-0190'
-    nodes = get_skeleton(skeleton_file)
-    name = 'taniks_reborn'
+    skeleton_file = '0186-138F'
+    names = get_skeleton_names()
+    nodes = get_skeleton(skeleton_file, names)
+    name = 'player'
     test_export(skeleton_file, nodes, name)
     write_info_out(skeleton_file, nodes, name)
+    write_fbx_skeleton(skeleton_file, nodes, name)
+
+    """
+    Rotation is inherited across the skeleton. This poses (aha) an issue, since the rotations given seem to be per-bone and not inherit based.
+    """

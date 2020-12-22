@@ -618,11 +618,11 @@ def get_verts_faces_files(model_file):
                 hf.pkg_name = gf.get_pkg_name(hf.name)
                 if j == 0:
                     hf.header = hf.get_header()
-                    print(f'Position file {hf.name} stride {hf.header.StrideLength}')
+                    # print(f'Position file {hf.name} stride {hf.header.StrideLength}')
                     pos_verts_files.append(hf)
                 elif j == 8:
                     hf.header = hf.get_header()
-                    print(f'UV file {hf.name} stride {hf.header.StrideLength}')
+                    # print(f'UV file {hf.name} stride {hf.header.StrideLength}')
                     uv_verts_files.append(hf)
                 elif j == 32:
                     faces_files.append(hf)
@@ -678,7 +678,7 @@ def adjust_faces_data(faces_data, max_vert_used):
 
 
 def get_model(model_file, all_file_info, lod, temp_direc=''):
-    print(f'Parent file {model_file}')
+    # print(f'Parent file {model_file}')
     pos_verts_files, uv_verts_files, faces_files = get_verts_faces_files(model_file)
     # lod_0_faces = get_lod_0_faces(model_file, len(pos_verts_files))
     # if not lod_0_faces:
@@ -687,6 +687,10 @@ def get_model(model_file, all_file_info, lod, temp_direc=''):
     for i, pos_vert_file in enumerate(pos_verts_files):
         faces_file = faces_files[i]
         pos_verts = get_verts_data(pos_vert_file, all_file_info, is_uv=False)
+        # if len(pos_verts) <= 65535:
+        #     continue
+        # else:
+        #     print(model_file, f'is larger!!!! {len(pos_verts)}')
         pos_verts = scale_and_repos_pos_verts(pos_verts, fbin)
         if i < len(uv_verts_files):
             uv_verts = get_verts_data(uv_verts_files[i], all_file_info, is_uv=True)
@@ -796,7 +800,7 @@ if __name__ == '__main__':
     # parent_file = '01BC-17FB'  # Vex harpy
     parent_file = '01E2-1347'  # type 3 stride 4
     parent_file = '01E2-1335'  # type 3 stride 8
-    parent_file = '01E2-0637'  #
+    parent_file = '01E5-16A5'  # splicer vandaal thing
     # parent_file = gf.get_file_from_hash('17B8B580')
     # get_model(parent_file, all_file_info)
     # parent_file = '0361-0012'
@@ -805,9 +809,9 @@ if __name__ == '__main__':
     # parent_file = get_file_from_hash(get_flipped_hex('1A20EC80', 8))
     # print(parent_file)
     # parent_file = '0378-03E5'
-    # get_model(parent_file, all_file_info, lod=True)
-    # quit()
-    select = 'environments'
+    get_model(parent_file, all_file_info, lod=True)
+    quit()
+    select = 'combatants'
     folder = select
     # folder = 'gambit'
     gf.mkdir(f'I:/dynamic_models/{folder}')
