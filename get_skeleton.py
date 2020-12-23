@@ -5,6 +5,7 @@ import pyfbx_jo as pfb
 import FbxCommon
 import scipy.spatial
 import numpy as np
+import quaternion
 
 class Node:
     def __init__(self):
@@ -66,6 +67,7 @@ def get_skeleton(file, names):
         node = nodes[a]
         node.dost = DefaultObjectSpaceTransform()
         node.dost.rotation = [struct.unpack('f', fbin[i + j:i+j+4])[0] for j in range(0, 0x10, 0x4)]
+        node.dost.rotation = [node.dost.rotation[0], node.dost.rotation[1], node.dost.rotation[2], node.dost.rotation[3]]
         node.dost.location = [struct.unpack('f', fbin[i + j:i+j+4])[0] for j in range(0x10, 0x1C, 0x4)]
         node.dost.scale = struct.unpack('f', fbin[i+0x1C:i+0x1C+4])[0]
 
@@ -116,6 +118,22 @@ def get_skeleton_names():
     return names
 
 
+def qmulv(q: fbx.FbxQuaternion, v: fbx.FbxVector4):
+    m = (q[1] * v[2] - q[2] * v[1]) + q[3] * v[0]
+    n = (q[2] * v[0] - q[0] * v[2]) + q[3] * v[1]
+    o = (q[0] * v[1] - q[1] * v[0]) + q[3] * v[2]
+
+    a = (o * q[1] - n * q[2])
+    a += a + v[0]
+    b = (m * q[2] - o * q[0])
+    b += b + v[1]
+    c = (n * q[0] - m * q[1])
+    c += c + v[2]
+    out = fbx.FbxDouble3(a, b, c)
+
+    return out
+
+
 def write_fbx_skeleton(file, nodes, name):
     lSdkManager, lScene = FbxCommon.InitializeSdkObjects()
     # Adding proper fbx nodes
@@ -133,16 +151,57 @@ def write_fbx_skeleton(file, nodes, name):
 
         r = scipy.spatial.transform.Rotation.from_quat(node.dost.rotation).as_euler('xyz', degrees=True)
         rot = r
-        if node.parent_node_index > 0:
+        if node.name == 'b_spine_2' and False:#node.parent_node_index > 0:
             n = scipy.spatial.transform.Rotation.from_quat(nodes[node.parent_node_index].dost.rotation).as_euler('xyz', degrees=True)
             k = scipy.spatial.transform.Rotation.from_quat(nodes[node.parent_node_index].dost.rotation)
             rot = [r[i] - n[i] for i in range(3)]
+            worldTM = nodes[node.parent_node_index].fbxnode.EvaluateGlobalTransform()
+            u = worldTM.GetQ()
+            q = quaternion.from_float_array([u[0], u[1], u[2], u[3]]).inverse()
+            q = quaternion.as_float_array(q)
+            # fbx.FbxVector4(rot[0], rot[1], rot[2])
+            # +X Z +Y
+            newVector = qmulv(fbx.FbxQuaternion(q[0], q[1], q[2], q[3]), fbx.FbxVector4(0, 0, 45))
+            node.fbxnode.LclRotation.Set(newVector)
+        elif node.name == 'b_spine_3' and False:
+            n = scipy.spatial.transform.Rotation.from_quat(nodes[node.parent_node_index].dost.rotation).as_euler('xyz', degrees=True)
+            k = scipy.spatial.transform.Rotation.from_quat(nodes[node.parent_node_index].dost.rotation)
+            rot = [r[i] - n[i] for i in range(3)]
+            worldTM = nodes[node.parent_node_index].fbxnode.EvaluateGlobalTransform()
+            u = worldTM.GetQ()
+            q = quaternion.from_float_array([u[0], u[1], u[2], u[3]]).inverse()
+            q = quaternion.as_float_array(q)
+            # fbx.FbxVector4(rot[0], rot[1], rot[2])
+            # +X Z +Y
+            newVector = qmulv(fbx.FbxQuaternion(q[0], q[1], q[2], q[3]), fbx.FbxVector4(0, 0, -45))
+            node.fbxnode.LclRotation.Set(newVector)
+        elif node.parent_node_index > 0:
+            n = scipy.spatial.transform.Rotation.from_quat(nodes[node.parent_node_index].dost.rotation).as_euler('xyz', degrees=True)
+            k = scipy.spatial.transform.Rotation.from_quat(nodes[node.parent_node_index].dost.rotation)
+            rot = [r[i] - n[i] for i in range(3)]
+            worldTM = nodes[node.parent_node_index].fbxnode.EvaluateGlobalTransform()
+            u = worldTM.GetQ()
+            q = quaternion.from_float_array([u[0], u[1], u[2], u[3]]).inverse()
+            q = quaternion.as_float_array(q)
+            # fbx.FbxVector4(rot[0], rot[1], rot[2])
+            # +X -Z +Y ;
+            newVector = qmulv(fbx.FbxQuaternion(q[0], q[1], q[2], q[3]), fbx.FbxVector4(rot[0], rot[1], rot[2]))
+            node.fbxnode.LclRotation.Set(newVector)
+        # elif node.parent_node_index > 0:
+        #     worldTM = nodes[node.parent_node_index].fbxnode.EvaluateGlobalTransform()
+        #     u = worldTM.GetQ()
+        #     q = quaternion.from_float_array([u[0], u[1], u[2], u[3]]).inverse()
+        #     q = quaternion.as_float_array(q)
+        #     newVector = qmulv(fbx.FbxQuaternion(q[0], q[1], q[2], q[3]), fbx.FbxVector4(0, 0, 90))
+        #     node.fbxnode.LclRotation.Set(newVector)
+
             # rot = scipy.spatial.transform.Rotation.apply(k, rot, inverse=False)
 
         node.fbxnode.SetTransformationInheritType(fbx.FbxTransform.eInheritRrs)
         if node.parent_node_index != -1:  # Checking to see if rotation is inherited
             a = 0
-            node.fbxnode.LclRotation.Set(fbx.FbxDouble3(rot[0], rot[1], rot[2]))
+            # node.fbxnode.LclRotation.Set(fbx.FbxDouble3(rot[0], rot[1], rot[2]))
+            # node.fbxnode.SetGeometricRotation(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(rot[0], rot[1], rot[2]))
 
         if node.parent_node_index != -1:
             n = scipy.spatial.transform.Rotation.from_quat(nodes[node.parent_node_index].dost.rotation)
@@ -152,6 +211,7 @@ def write_fbx_skeleton(file, nodes, name):
         else:
             loc = node.dost.location
         node.fbxnode.LclTranslation.Set(fbx.FbxDouble3(loc[0], loc[1], loc[2]))
+        # node.fbxnode.LclTranslation.Set(fbx.FbxDouble3(node.dost.location[0], node.dost.location[1], node.dost.location[2]))
 
     # Building heirachy
     root = None
@@ -170,8 +230,8 @@ def write_fbx_skeleton(file, nodes, name):
         # if i > 10:
         #     break
         # we want the spine to be perfectly straight. When it is, it's likely the rotation is correct.
-        # if node.name not in want:
-        #     continue
+        if node.name not in want:
+            continue
 
         """
         Notes:
