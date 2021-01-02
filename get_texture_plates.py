@@ -33,12 +33,12 @@ class TexturePlateSet:
             fb = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(platesetfile)}/{platesetfile}.bin', 'rb').read()
         except FileNotFoundError:
             return False
-        a = TexturePlate(gf.get_file_from_hash(bytes.hex(fb[0x28:0x28+4])), 'a')
-        b = TexturePlate(gf.get_file_from_hash(bytes.hex(fb[0x2C:0x2C+4])), 'b')
-        c = TexturePlate(gf.get_file_from_hash(bytes.hex(fb[0x30:0x30+4])), 'c')
-        d = TexturePlate(gf.get_file_from_hash(bytes.hex(fb[0x34:0x34+4])), 'd')
+        a = TexturePlate(gf.get_file_from_hash(bytes.hex(fb[0x28:0x28+4])), 'diffuse')
+        b = TexturePlate(gf.get_file_from_hash(bytes.hex(fb[0x2C:0x2C+4])), 'normal')
+        c = TexturePlate(gf.get_file_from_hash(bytes.hex(fb[0x30:0x30+4])), 'gstack')
+        d = TexturePlate(gf.get_file_from_hash(bytes.hex(fb[0x34:0x34+4])), 'dyemap')
 
-        return {'a': a, 'b': b, 'c': c, 'd': d}
+        return {'diffuse': a, 'normal': b, 'gstack': c, 'dyemap': d}
 
     def export_texture_plate_set(self, save_dir):
         # We'll append _diffuse.png, _normal.png, _gstack.png to the save_dir per set
@@ -76,7 +76,10 @@ class TexturePlate:
             tex.image = tex.image.resize([tex.resizex, tex.resizey])
 
     def export_plate(self, save_dir):
-        bg_plate = Image.new('RGBA', [2048, 2048], (0, 0, 0, 0))  # Makes a transparent image as alpha = 0
+        if self.type == 'dyemap':
+            bg_plate = Image.new('RGBA', [1024, 1024], (0, 0, 0, 0))  # Makes a transparent image as alpha = 0
+        else:
+            bg_plate = Image.new('RGBA', [2048, 2048], (0, 0, 0, 0))  # Makes a transparent image as alpha = 0
         for tex in self.textures:
             bg_plate.paste(tex.image, [tex.platex, tex.platey])
         bg_plate.save(save_dir)
