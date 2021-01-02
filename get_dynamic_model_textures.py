@@ -80,8 +80,8 @@ test_dir = 'I:/d2_output_3_0_1_3'
 def get_float16(hex_data, j, is_uv=False):
     # flt = get_signed_int(gf.get_flipped_hex(hex_data[j * 4:j * 4 + 4], 4), 16)
     flt = int.from_bytes(binascii.unhexlify(hex_data[j * 4:j * 4 + 4]), 'little', signed=True)
-    if j == 1 and is_uv:
-        flt *= -1
+    # if j == 1 and is_uv:
+    #     flt *= -1
     flt = 1 + flt / (2 ** 15 - 1)
     return flt
 
@@ -801,6 +801,7 @@ if __name__ == '__main__':
     parent_file = '01E2-1347'  # type 3 stride 4
     parent_file = '01E2-1335'  # type 3 stride 8
     parent_file = '01E5-16A5'  # splicer vandaal thing
+    parent_file = '0157-048E'  # mask of bakris
     # parent_file = gf.get_file_from_hash('17B8B580')
     # get_model(parent_file, all_file_info)
     # parent_file = '0361-0012'

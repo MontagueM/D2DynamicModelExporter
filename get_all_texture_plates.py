@@ -9,7 +9,7 @@ all_file_info = {x: y for x, y in {x[0]: dict(zip(['Reference', 'FileType'], x[1
 counter = 0
 for file in all_file_info.keys():
     name = gf.get_file_from_hash(file)
-    if '0157' not in name:
+    if '0156' not in name:
         continue
     if all_file_info[file]['FileType'] == 'Dynamic Model Header 1':
         print(name)
@@ -22,5 +22,5 @@ for file in all_file_info.keys():
             print('Nothing in texture plate')
             continue
         gf.mkdir(f'I:/d2/tex_plates_png/{gf.get_pkg_name(name)}/')
-        texplateset.export_texture_plate_set(f'I:/d2/tex_plates_png/{gf.get_pkg_name(name)}/{counter}')
+        texplateset.export_texture_plate_set(f'I:/d2/tex_plates_png/{gf.get_pkg_name(name)}/{name}')
         counter += 1
