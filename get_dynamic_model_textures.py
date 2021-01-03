@@ -449,7 +449,7 @@ def scale_and_repos_uv_verts(verts_data, fbin):
     return verts_data
 
 
-def export_fbx(submeshes, model_file, name, temp_direc):
+def export_fbx(submeshes, model_file, name, temp_direc, b_temp_direc_full):
     model = pfb.Model()
     for submesh in submeshes:
         mesh = create_mesh(model, submesh, name)
@@ -471,10 +471,14 @@ def export_fbx(submeshes, model_file, name, temp_direc):
         model.scene.GetRootNode().AddChild(node)
 
 
-    if temp_direc or temp_direc != '':
-        gf.mkdir(f'I:/dynamic_models/{temp_direc}/')
+
+    if b_temp_direc_full:
+        model.export(save_path=f'{temp_direc}/{name}.fbx', ascii_format=False)
+    else:
+        if temp_direc or temp_direc != '':
+            gf.mkdir(f'I:/dynamic_models/{temp_direc}/')
         gf.mkdir(f'I:/dynamic_models/{temp_direc}/{model_file}')
-    model.export(save_path=f'I:/dynamic_models/{temp_direc}/{model_file}/{name}.fbx', ascii_format=False)
+        model.export(save_path=f'I:/dynamic_models/{temp_direc}/{model_file}/{name}.fbx', ascii_format=False)
     print(f'Written I:/dynamic_models/{temp_direc}/{model_file}/{name}.fbx.')
 
 
@@ -702,7 +706,7 @@ def adjust_faces_data(faces_data, max_vert_used):
     return new_faces_data, max(all_v)
 
 
-def get_model(parent_file, all_file_info, lod, temp_direc='', b_textures=False):
+def get_model(parent_file, all_file_info, lod, temp_direc='', b_textures=False, b_temp_direc_full=False, b_helmet=False):
     fbdyn1 = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(parent_file)}/{parent_file}.bin', 'rb').read()
     dyn2 = gf.get_file_from_hash(bytes.hex(fbdyn1[0xB0:0xB0+4]))
     fbdyn2 = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(dyn2)}/{dyn2}.bin', 'rb').read()
@@ -745,14 +749,14 @@ def get_model(parent_file, all_file_info, lod, temp_direc='', b_textures=False):
             else:
                 submeshes_to_write.append(submesh)
         if lod:
-            export_fbx(submeshes_to_write, model_file, pos_vert_file.uid, temp_direc)
+            export_fbx(submeshes_to_write, model_file, pos_vert_file.uid, temp_direc, b_temp_direc_full)
         else:
-            export_fbx(submeshes, model_file, pos_vert_file.uid, temp_direc)
+            export_fbx(submeshes, model_file, pos_vert_file.uid, temp_direc, b_temp_direc_full)
         if b_textures:
-            save_texture_plates(parent_file, temp_direc, model_file)
+            save_texture_plates(parent_file, all_file_info, temp_direc, b_temp_direc_full, b_helmet, model_file)
 
 
-def save_texture_plates(dyn1, temp_direc, model_file):
+def save_texture_plates(dyn1, all_file_info, temp_direc, b_temp_direc_full, b_helmet, model_file):
     texplateset = gtp.TexturePlateSet(dyn1, direct_from_tex=False)
     if not texplateset.plates:  # No tex plate
         print('No texture plate')
@@ -761,7 +765,10 @@ def save_texture_plates(dyn1, temp_direc, model_file):
     if not ret:  # Is a tex plate but just nothing in it
         print('Nothing in texture plate')
         return
-    texplateset.export_texture_plate_set(f'I:/dynamic_models/{temp_direc}/{model_file}/texplate')
+    if b_temp_direc_full:
+        texplateset.export_texture_plate_set(f'{temp_direc}/texplate', b_helmet)
+    else:
+        texplateset.export_texture_plate_set(f'I:/dynamic_models/{temp_direc}/{model_file}/texplate')
 
 
 # def scale_verts(verts_data, model_file):
@@ -833,7 +840,11 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['Reference', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, Reference, FileType')}
     # Only dynamic model 1
-    parent_file = '0157-0487'
+
+    parent_file = '0157-0487'  # Bakris
+    parent_file = '0170-0B97'  # Activity sword
+    parent_file = '01B8-08C6'  # Atraks
+
     get_model(parent_file, all_file_info, lod=True, b_textures=True)
     quit()
     select = 'combatants'
