@@ -448,7 +448,7 @@ def scale_and_repos_uv_verts(verts_data, fbin):
     return verts_data
 
 
-def export_fbx(submeshes, model_file, name, temp_direc):
+def export_fbx(submeshes, model_file, name, temp_direc, b_textures):
     model = pfb.Model()
     fbin = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(model_file)}/{model_file}.bin', 'rb').read()
     for submesh in submeshes:
@@ -458,12 +458,15 @@ def export_fbx(submeshes, model_file, name, temp_direc):
         layer = mesh.GetLayer(0)
         # if shaders:
         #     apply_shader(d2map, submesh, node)
-        # apply_diffuse(d2map, submesh, node)
         if submesh.uv_verts:
             create_uv(mesh, model_file, submesh, layer)
         node = fbx.FbxNode.Create(model.scene, submesh.name)
         node.SetNodeAttribute(mesh)
         node.LclScaling.Set(fbx.FbxDouble3(100, 100, 100))
+
+        if b_textures:
+            apply_diffuse(model, submesh, node)
+
         node.SetShadingMode(fbx.FbxNode.eTextureShading)
         model.scene.GetRootNode().AddChild(node)
 
@@ -479,6 +482,34 @@ def export_fbx(submeshes, model_file, name, temp_direc):
         pass
     model.export(save_path=f'I:/dynamic_models/{temp_direc}/{model_file}/{name}.fbx', ascii_format=False)
     print(f'Written I:/dynamic_models/{temp_direc}/{model_file}/{name}.fbx.')
+
+
+def apply_diffuse(model, submesh, node):
+    # print('applying diffuse', tex_name)
+    lMaterialName = f'mat {submesh.material}'
+    lMaterial = fbx.FbxSurfacePhong.Create(model.scene, lMaterialName)
+    lMaterial.DiffuseFactor.Set(1)
+    lMaterial.ShadingModel.Set('Phong')
+    node.AddMaterial(lMaterial)
+
+
+    gTexture = fbx.FbxFileTexture.Create(model.scene, f'Diffuse Texture {submesh.material}')
+    # lTexPath = f'C:/d2_maps/{folder_name}_fbx/textures/{tex_name}.png'
+    lTexPath = tex_path
+    # print('tex path', f'C:/d2_maps/{folder_name}_fbx/textures/{tex_name}.png')
+    gTexture.SetFileName(lTexPath)
+    gTexture.SetTextureUse(fbx.FbxFileTexture.eStandard)
+    gTexture.SetMappingType(fbx.FbxFileTexture.eUV)
+    gTexture.SetMaterialUse(fbx.FbxFileTexture.eModelMaterial)
+    gTexture.SetSwapUV(False)
+    gTexture.SetTranslation(0.0, 0.0)
+    gTexture.SetScale(1.0, 1.0)
+    gTexture.SetRotation(0.0, 0.0)
+
+    if lMaterial:
+        lMaterial.Diffuse.ConnectSrcObject(gTexture)
+    else:
+        raise RuntimeError('Material broken somewhere')
 
 
 def get_submesh_faces(submesh: Submesh, faces_hex, stride):
@@ -677,7 +708,7 @@ def adjust_faces_data(faces_data, max_vert_used):
     return new_faces_data, max(all_v)
 
 
-def get_model(model_file, all_file_info, lod, temp_direc=''):
+def get_model(model_file, all_file_info, lod, temp_direc='', b_textures=False):
     # print(f'Parent file {model_file}')
     pos_verts_files, uv_verts_files, faces_files = get_verts_faces_files(model_file)
     # lod_0_faces = get_lod_0_faces(model_file, len(pos_verts_files))
@@ -715,9 +746,9 @@ def get_model(model_file, all_file_info, lod, temp_direc=''):
             else:
                 submeshes_to_write.append(submesh)
         if lod:
-            export_fbx(submeshes_to_write, model_file, pos_vert_file.uid, temp_direc)
+            export_fbx(submeshes_to_write, model_file, pos_vert_file.uid, temp_direc, b_textures)
         else:
-            export_fbx(submeshes, model_file, pos_vert_file.uid, temp_direc)
+            export_fbx(submeshes, model_file, pos_vert_file.uid, temp_direc, b_textures)
 
 
 # def scale_verts(verts_data, model_file):
@@ -802,6 +833,7 @@ if __name__ == '__main__':
     parent_file = '01E2-1335'  # type 3 stride 8
     parent_file = '01E5-16A5'  # splicer vandaal thing
     parent_file = '0157-048E'  # mask of bakris
+    parent_file = '0157-0801'  # cinderpinion vest
     # parent_file = gf.get_file_from_hash('17B8B580')
     # get_model(parent_file, all_file_info)
     # parent_file = '0361-0012'
@@ -810,7 +842,7 @@ if __name__ == '__main__':
     # parent_file = get_file_from_hash(get_flipped_hex('1A20EC80', 8))
     # print(parent_file)
     # parent_file = '0378-03E5'
-    get_model(parent_file, all_file_info, lod=True)
+    get_model(parent_file, all_file_info, lod=True, textures=True)
     quit()
     select = 'combatants'
     folder = select
