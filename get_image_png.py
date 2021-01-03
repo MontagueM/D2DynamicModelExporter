@@ -51,8 +51,8 @@ def get_image_from_data(header, dimensions, data_hex):
 
 
 def get_image_png(tex_header, all_file_info):  # Tex Header must be a hash
-    name = gf.get_file_from_hash(tex_header)
-    fb = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(name)}/{name}.bin', 'rb').read()
+    # name = gf.get_file_from_hash(tex_header)
+    fb = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(tex_header)}/{tex_header}.bin', 'rb').read()
     header = ImageHeader()
     header.Width = gf.get_int16(fb, 0x22)
     header.Height = gf.get_int16(fb, 0x24)

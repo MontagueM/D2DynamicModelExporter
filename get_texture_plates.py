@@ -60,7 +60,7 @@ class TexturePlate:
         table_offset = 0x40
         for i in range(table_offset, table_offset+file_count*20, 20):
             tex = Texture()
-            tex.tex_header = bytes.hex(fb[i:i+4]).upper()
+            tex.tex_header = gf.get_file_from_hash(bytes.hex(fb[i:i+4]).upper())
             tex.platex = gf.get_uint32(fb, i+0x4)
             tex.platey = gf.get_uint32(fb, i+0x8)
             tex.resizex = gf.get_uint32(fb, i+0xC)
@@ -98,8 +98,9 @@ if __name__ == '__main__':
     pkg_db.start_db_connection('3_0_1_3')
     all_file_info = {x: y for x, y in {x[0]: dict(zip(['Reference', 'FileType'], x[1:])) for x in
                                        pkg_db.get_entries_from_table('Everything',
-                                                                     'Hash, Reference, FileType')}.items()}
+                                                                     'FileName, Reference, FileType')}.items()}
 
+    # Give it dyn1
     file = '0157-07F8'
     texplateset = TexturePlateSet(file, direct_from_tex=False)
     ret = texplateset.get_plate_set(all_file_info)

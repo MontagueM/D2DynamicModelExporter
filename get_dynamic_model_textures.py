@@ -8,6 +8,7 @@ import fbx
 import pyfbx_jo as pfb
 import struct
 import binascii
+import get_texture_plates as gtp
 
 
 @dataclass
@@ -94,7 +95,7 @@ def get_verts_data(verts_file, all_file_info, is_uv):
     pkg_name = verts_file.pkg_name
     if not pkg_name:
         return None
-    ref_file = f"{all_file_info[verts_file.name]['RefPKG'][2:]}-{all_file_info[verts_file.name]['RefID'][2:]}"
+    ref_file = gf.get_file_from_hash(all_file_info[verts_file.name]['Reference'])
     ref_pkg_name = gf.get_pkg_name(ref_file)
     ref_file_type = all_file_info[ref_file]['FileType']
     # ref_pkg_name, ref_file, ref_file_type = get_referenced_file(verts_file)
@@ -448,9 +449,8 @@ def scale_and_repos_uv_verts(verts_data, fbin):
     return verts_data
 
 
-def export_fbx(submeshes, model_file, name, temp_direc, b_textures):
+def export_fbx(submeshes, model_file, name, temp_direc):
     model = pfb.Model()
-    fbin = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(model_file)}/{model_file}.bin', 'rb').read()
     for submesh in submeshes:
         mesh = create_mesh(model, submesh, name)
         if not mesh.GetLayer(0):
@@ -464,52 +464,46 @@ def export_fbx(submeshes, model_file, name, temp_direc, b_textures):
         node.SetNodeAttribute(mesh)
         node.LclScaling.Set(fbx.FbxDouble3(100, 100, 100))
 
-        if b_textures:
-            apply_diffuse(model, submesh, node)
+        # if b_textures:
+            # apply_diffuse(model, submesh, node)
 
         node.SetShadingMode(fbx.FbxNode.eTextureShading)
         model.scene.GetRootNode().AddChild(node)
 
 
     if temp_direc or temp_direc != '':
-        try:
-            os.mkdir(f'I:/dynamic_models/{temp_direc}/')
-        except:
-            pass
-    try:
-        os.mkdir(f'I:/dynamic_models/{temp_direc}/{model_file}')
-    except:
-        pass
+        gf.mkdir(f'I:/dynamic_models/{temp_direc}/')
+        gf.mkdir(f'I:/dynamic_models/{temp_direc}/{model_file}')
     model.export(save_path=f'I:/dynamic_models/{temp_direc}/{model_file}/{name}.fbx', ascii_format=False)
     print(f'Written I:/dynamic_models/{temp_direc}/{model_file}/{name}.fbx.')
 
 
-def apply_diffuse(model, submesh, node):
-    # print('applying diffuse', tex_name)
-    lMaterialName = f'mat {submesh.material}'
-    lMaterial = fbx.FbxSurfacePhong.Create(model.scene, lMaterialName)
-    lMaterial.DiffuseFactor.Set(1)
-    lMaterial.ShadingModel.Set('Phong')
-    node.AddMaterial(lMaterial)
-
-
-    gTexture = fbx.FbxFileTexture.Create(model.scene, f'Diffuse Texture {submesh.material}')
-    # lTexPath = f'C:/d2_maps/{folder_name}_fbx/textures/{tex_name}.png'
-    lTexPath = tex_path
-    # print('tex path', f'C:/d2_maps/{folder_name}_fbx/textures/{tex_name}.png')
-    gTexture.SetFileName(lTexPath)
-    gTexture.SetTextureUse(fbx.FbxFileTexture.eStandard)
-    gTexture.SetMappingType(fbx.FbxFileTexture.eUV)
-    gTexture.SetMaterialUse(fbx.FbxFileTexture.eModelMaterial)
-    gTexture.SetSwapUV(False)
-    gTexture.SetTranslation(0.0, 0.0)
-    gTexture.SetScale(1.0, 1.0)
-    gTexture.SetRotation(0.0, 0.0)
-
-    if lMaterial:
-        lMaterial.Diffuse.ConnectSrcObject(gTexture)
-    else:
-        raise RuntimeError('Material broken somewhere')
+# def apply_diffuse(model, submesh, node):
+#     # print('applying diffuse', tex_name)
+#     lMaterialName = f'mat {submesh.material}'
+#     lMaterial = fbx.FbxSurfacePhong.Create(model.scene, lMaterialName)
+#     lMaterial.DiffuseFactor.Set(1)
+#     lMaterial.ShadingModel.Set('Phong')
+#     node.AddMaterial(lMaterial)
+#
+#
+#     gTexture = fbx.FbxFileTexture.Create(model.scene, f'Diffuse Texture {submesh.material}')
+#     # lTexPath = f'C:/d2_maps/{folder_name}_fbx/textures/{tex_name}.png'
+#     lTexPath = tex_path
+#     # print('tex path', f'C:/d2_maps/{folder_name}_fbx/textures/{tex_name}.png')
+#     gTexture.SetFileName(lTexPath)
+#     gTexture.SetTextureUse(fbx.FbxFileTexture.eStandard)
+#     gTexture.SetMappingType(fbx.FbxFileTexture.eUV)
+#     gTexture.SetMaterialUse(fbx.FbxFileTexture.eModelMaterial)
+#     gTexture.SetSwapUV(False)
+#     gTexture.SetTranslation(0.0, 0.0)
+#     gTexture.SetScale(1.0, 1.0)
+#     gTexture.SetRotation(0.0, 0.0)
+#
+#     if lMaterial:
+#         lMaterial.Diffuse.ConnectSrcObject(gTexture)
+#     else:
+#         raise RuntimeError('Material broken somewhere')
 
 
 def get_submesh_faces(submesh: Submesh, faces_hex, stride):
@@ -552,7 +546,7 @@ def get_submesh_faces(submesh: Submesh, faces_hex, stride):
 
 def get_face_hex(faces_file, all_file_info) -> str:
     try:
-        ref_file = f"{all_file_info[faces_file.name]['RefPKG'][2:]}-{all_file_info[faces_file.name]['RefID'][2:]}"
+        ref_file = gf.get_file_from_hash(all_file_info[faces_file.name]['Reference'])
     except KeyError:
         return ''
     ref_pkg_name = gf.get_pkg_name(ref_file)
@@ -708,13 +702,18 @@ def adjust_faces_data(faces_data, max_vert_used):
     return new_faces_data, max(all_v)
 
 
-def get_model(model_file, all_file_info, lod, temp_direc='', b_textures=False):
+def get_model(parent_file, all_file_info, lod, temp_direc='', b_textures=False):
+    fbdyn1 = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(parent_file)}/{parent_file}.bin', 'rb').read()
+    dyn2 = gf.get_file_from_hash(bytes.hex(fbdyn1[0xB0:0xB0+4]))
+    fbdyn2 = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(dyn2)}/{dyn2}.bin', 'rb').read()
+    offset = gf.get_uint16(fbdyn2, 0x18) + 572
+    model_file = gf.get_file_from_hash(bytes.hex(fbdyn2[offset:offset + 4]))
+    fbdyn3 = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(model_file)}/{model_file}.bin', 'rb').read()
     # print(f'Parent file {model_file}')
     pos_verts_files, uv_verts_files, faces_files = get_verts_faces_files(model_file)
     # lod_0_faces = get_lod_0_faces(model_file, len(pos_verts_files))
     # if not lod_0_faces:
     #     return
-    fbin = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(model_file)}/{model_file}.bin', 'rb').read()
     for i, pos_vert_file in enumerate(pos_verts_files):
         faces_file = faces_files[i]
         pos_verts = get_verts_data(pos_vert_file, all_file_info, is_uv=False)
@@ -722,10 +721,10 @@ def get_model(model_file, all_file_info, lod, temp_direc='', b_textures=False):
         #     continue
         # else:
         #     print(model_file, f'is larger!!!! {len(pos_verts)}')
-        pos_verts = scale_and_repos_pos_verts(pos_verts, fbin)
+        pos_verts = scale_and_repos_pos_verts(pos_verts, fbdyn3)
         if i < len(uv_verts_files):
             uv_verts = get_verts_data(uv_verts_files[i], all_file_info, is_uv=True)
-            uv_verts = scale_and_repos_uv_verts(uv_verts, fbin)
+            uv_verts = scale_and_repos_uv_verts(uv_verts, fbdyn3)
         else:
             uv_verts = []
         # scaled_pos_verts = scale_verts(coords, model_file)
@@ -746,9 +745,23 @@ def get_model(model_file, all_file_info, lod, temp_direc='', b_textures=False):
             else:
                 submeshes_to_write.append(submesh)
         if lod:
-            export_fbx(submeshes_to_write, model_file, pos_vert_file.uid, temp_direc, b_textures)
+            export_fbx(submeshes_to_write, model_file, pos_vert_file.uid, temp_direc)
         else:
-            export_fbx(submeshes, model_file, pos_vert_file.uid, temp_direc, b_textures)
+            export_fbx(submeshes, model_file, pos_vert_file.uid, temp_direc)
+        if b_textures:
+            save_texture_plates(parent_file, temp_direc, model_file)
+
+
+def save_texture_plates(dyn1, temp_direc, model_file):
+    texplateset = gtp.TexturePlateSet(dyn1, direct_from_tex=False)
+    if not texplateset.plates:  # No tex plate
+        print('No texture plate')
+        return
+    ret = texplateset.get_plate_set(all_file_info)
+    if not ret:  # Is a tex plate but just nothing in it
+        print('Nothing in texture plate')
+        return
+    texplateset.export_texture_plate_set(f'I:/dynamic_models/{temp_direc}/{model_file}/texplate')
 
 
 # def scale_verts(verts_data, model_file):
@@ -817,32 +830,11 @@ def export_all_models(pkg_name, all_file_info, select, lod):
 
 if __name__ == '__main__':
     pkg_db.start_db_connection('3_0_1_3')
-    all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
-                     pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
-    # RefID 0x13A5, RefPKG 0x0003
-    # parent_file = '023A-1DE0'
-    # parent_file = '0234-16B2'
-    # parent_file = '03B8-047B'
-    # parent_file = '0157-04AA'  # Moonfang Grips
-    # parent_file = '0157-06A4'  # Moonfang rig
-    # parent_file = '0156-1E0A'  # Cinderpinion bios
-    parent_file = '01B6-0C48'  # Wyvern
-    # parent_file = '0148-08A0'  # Uldren cinematic
-    # parent_file = '01BC-17FB'  # Vex harpy
-    parent_file = '01E2-1347'  # type 3 stride 4
-    parent_file = '01E2-1335'  # type 3 stride 8
-    parent_file = '01E5-16A5'  # splicer vandaal thing
-    parent_file = '0157-048E'  # mask of bakris
-    parent_file = '0157-0801'  # cinderpinion vest
-    # parent_file = gf.get_file_from_hash('17B8B580')
-    # get_model(parent_file, all_file_info)
-    # parent_file = '0361-0012'
-    # parent_file = '020E-1F9C'l
-    # parent_file = '01FE-054A'
-    # parent_file = get_file_from_hash(get_flipped_hex('1A20EC80', 8))
-    # print(parent_file)
-    # parent_file = '0378-03E5'
-    get_model(parent_file, all_file_info, lod=True, textures=True)
+    all_file_info = {x[0]: dict(zip(['Reference', 'FileType'], x[1:])) for x in
+                     pkg_db.get_entries_from_table('Everything', 'FileName, Reference, FileType')}
+    # Only dynamic model 1
+    parent_file = '0157-0487'
+    get_model(parent_file, all_file_info, lod=True, b_textures=True)
     quit()
     select = 'combatants'
     folder = select

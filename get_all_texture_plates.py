@@ -5,7 +5,7 @@ import gf
 pkg_db.start_db_connection('3_0_1_3')
 all_file_info = {x: y for x, y in {x[0]: dict(zip(['Reference', 'FileType'], x[1:])) for x in
                                    pkg_db.get_entries_from_table('Everything',
-                                                                 'Hash, Reference, FileType')}.items()}
+                                                                 'FileName, Reference, FileType')}.items()}
 counter = 0
 for file in all_file_info.keys():
     name = gf.get_file_from_hash(file)
