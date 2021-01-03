@@ -449,7 +449,7 @@ def scale_and_repos_uv_verts(verts_data, fbin):
     return verts_data
 
 
-def export_fbx(submeshes, model_file, name, temp_direc, b_temp_direc_full):
+def export_fbx(submeshes, model_file, name, temp_direc, b_temp_direc_full, b_apply_textures):
     model = pfb.Model()
     for submesh in submeshes:
         mesh = create_mesh(model, submesh, name)
@@ -464,8 +464,8 @@ def export_fbx(submeshes, model_file, name, temp_direc, b_temp_direc_full):
         node.SetNodeAttribute(mesh)
         node.LclScaling.Set(fbx.FbxDouble3(100, 100, 100))
 
-        # if b_textures:
-            # apply_diffuse(model, submesh, node)
+        if b_apply_textures:
+            apply_diffuse(model, model_file, node, name, temp_direc, b_temp_direc_full)
 
         node.SetShadingMode(fbx.FbxNode.eTextureShading)
         model.scene.GetRootNode().AddChild(node)
@@ -482,32 +482,35 @@ def export_fbx(submeshes, model_file, name, temp_direc, b_temp_direc_full):
     print(f'Written I:/dynamic_models/{temp_direc}/{model_file}/{name}.fbx.')
 
 
-# def apply_diffuse(model, submesh, node):
-#     # print('applying diffuse', tex_name)
-#     lMaterialName = f'mat {submesh.material}'
-#     lMaterial = fbx.FbxSurfacePhong.Create(model.scene, lMaterialName)
-#     lMaterial.DiffuseFactor.Set(1)
-#     lMaterial.ShadingModel.Set('Phong')
-#     node.AddMaterial(lMaterial)
-#
-#
-#     gTexture = fbx.FbxFileTexture.Create(model.scene, f'Diffuse Texture {submesh.material}')
-#     # lTexPath = f'C:/d2_maps/{folder_name}_fbx/textures/{tex_name}.png'
-#     lTexPath = tex_path
-#     # print('tex path', f'C:/d2_maps/{folder_name}_fbx/textures/{tex_name}.png')
-#     gTexture.SetFileName(lTexPath)
-#     gTexture.SetTextureUse(fbx.FbxFileTexture.eStandard)
-#     gTexture.SetMappingType(fbx.FbxFileTexture.eUV)
-#     gTexture.SetMaterialUse(fbx.FbxFileTexture.eModelMaterial)
-#     gTexture.SetSwapUV(False)
-#     gTexture.SetTranslation(0.0, 0.0)
-#     gTexture.SetScale(1.0, 1.0)
-#     gTexture.SetRotation(0.0, 0.0)
-#
-#     if lMaterial:
-#         lMaterial.Diffuse.ConnectSrcObject(gTexture)
-#     else:
-#         raise RuntimeError('Material broken somewhere')
+def apply_diffuse(model, model_file, node, name, temp_direc, b_temp_direc_full):
+    # print('applying diffuse', tex_name)
+    lMaterialName = f'mat texplate_diffuse'
+    lMaterial = fbx.FbxSurfacePhong.Create(model.scene, lMaterialName)
+    lMaterial.DiffuseFactor.Set(1)
+    lMaterial.ShadingModel.Set('Phong')
+    node.AddMaterial(lMaterial)
+
+    gTexture = fbx.FbxFileTexture.Create(model.scene, f'Diffuse Texture texplate_diffuse')
+    # lTexPath = f'C:/d2_maps/{folder_name}_fbx/textures/{tex_name}.png'
+    if b_temp_direc_full:
+        lTexPath = f'{temp_direc}/texplate_diffuse.png'
+    else:
+        lTexPath = f'I:/dynamic_models/{temp_direc}/{model_file}/texplate_diffuse.png'
+    # print('tex path', f'C:/d2_maps/{folder_name}_fbx/textures/{tex_name}.png')
+    gTexture.SetFileName(lTexPath)
+    gTexture.SetRelativeFileName(lTexPath)
+    gTexture.SetTextureUse(fbx.FbxFileTexture.eStandard)
+    gTexture.SetMappingType(fbx.FbxFileTexture.eUV)
+    gTexture.SetMaterialUse(fbx.FbxFileTexture.eModelMaterial)
+    gTexture.SetSwapUV(False)
+    gTexture.SetTranslation(0.0, 0.0)
+    gTexture.SetScale(1.0, 1.0)
+    gTexture.SetRotation(0.0, 0.0)
+
+    if lMaterial:
+        lMaterial.Diffuse.ConnectSrcObject(gTexture)
+    else:
+        raise RuntimeError('Material broken somewhere')
 
 
 def get_submesh_faces(submesh: Submesh, faces_hex, stride):
@@ -706,7 +709,7 @@ def adjust_faces_data(faces_data, max_vert_used):
     return new_faces_data, max(all_v)
 
 
-def get_model(parent_file, all_file_info, lod, temp_direc='', b_textures=False, b_temp_direc_full=False, b_helmet=False):
+def get_model(parent_file, all_file_info, lod, temp_direc='', b_textures=False, b_temp_direc_full=False, b_helmet=False, b_apply_textures=False):
     fbdyn1 = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(parent_file)}/{parent_file}.bin', 'rb').read()
     dyn2 = gf.get_file_from_hash(bytes.hex(fbdyn1[0xB0:0xB0+4]))
     fbdyn2 = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(dyn2)}/{dyn2}.bin', 'rb').read()
@@ -748,12 +751,12 @@ def get_model(parent_file, all_file_info, lod, temp_direc='', b_textures=False, 
                     # write_submesh_fbx(submesh, temp_direc, model_file)
             else:
                 submeshes_to_write.append(submesh)
-        if lod:
-            export_fbx(submeshes_to_write, model_file, pos_vert_file.uid, temp_direc, b_temp_direc_full)
-        else:
-            export_fbx(submeshes, model_file, pos_vert_file.uid, temp_direc, b_temp_direc_full)
         if b_textures:
             save_texture_plates(parent_file, all_file_info, temp_direc, b_temp_direc_full, b_helmet, model_file)
+        if lod:
+            export_fbx(submeshes_to_write, model_file, pos_vert_file.uid, temp_direc, b_temp_direc_full, b_apply_textures)
+        else:
+            export_fbx(submeshes, model_file, pos_vert_file.uid, temp_direc, b_temp_direc_full, b_apply_textures)
 
 
 def save_texture_plates(dyn1, all_file_info, temp_direc, b_temp_direc_full, b_helmet, model_file):

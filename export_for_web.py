@@ -9,10 +9,12 @@ import gf
 import os
 
 
-def get_all_to_gltf(direc, b_textures):
+def get_gltf(direc, dyn1, b_textures):
+    gdmt.get_model(dyn1, all_file_info, lod=True, temp_direc=f'I:/d2/web_dyn/{name}', b_temp_direc_full=True,
+                   b_textures=b_textures, b_helmet=b_textures, b_apply_textures=b_textures)
     files = [x for x in os.listdir(direc) if '.fbx' in x]
     for file in files:
-        os.system(f'fbx2gltf.exe --input {direc}/{file} --output {direc}/{file[:-4]}.glb')
+        os.system(f'fbx2gltf.exe -e -i {direc}/{file} -o {direc}/{file[:-4]}.glb')
 
 
 if __name__ == '__main__':
@@ -27,7 +29,7 @@ if __name__ == '__main__':
 
     for name, file in helmets.items():
         gf.mkdir(f'I:/d2/web_dyn/{name}')
-        gdmt.get_model(file, all_file_info, lod=True, temp_direc=f'I:/d2/web_dyn/{name}', b_temp_direc_full=True,
-                       b_textures=True, b_helmet=True)
-        get_all_to_gltf(f'I:/d2/web_dyn/{name}', b_textures=True)
+        get_gltf(f'I:/d2/web_dyn/{name}', file, b_textures=True)
+        # gdmt.get_model(file, all_file_info, lod=True, temp_direc=f'I:/d2/web_dyn/{name}', b_temp_direc_full=True,
+        #                b_textures=False, b_helmet=False, b_apply_textures=False)  # Textures already pulled out
         break
