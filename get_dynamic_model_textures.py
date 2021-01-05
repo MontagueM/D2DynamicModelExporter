@@ -709,12 +709,15 @@ def adjust_faces_data(faces_data, max_vert_used):
     return new_faces_data, max(all_v)
 
 
-def get_model(parent_file, all_file_info, lod, temp_direc='', b_textures=False, b_temp_direc_full=False, b_helmet=False, b_apply_textures=False):
-    fbdyn1 = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(parent_file)}/{parent_file}.bin', 'rb').read()
-    dyn2 = gf.get_file_from_hash(bytes.hex(fbdyn1[0xB0:0xB0+4]))
-    fbdyn2 = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(dyn2)}/{dyn2}.bin', 'rb').read()
-    offset = gf.get_uint16(fbdyn2, 0x18) + 572
-    model_file = gf.get_file_from_hash(bytes.hex(fbdyn2[offset:offset + 4]))
+def get_model(parent_file, all_file_info, lod, temp_direc='', b_textures=False, b_temp_direc_full=False, b_helmet=False, b_apply_textures=False, passing_dyn3=False):
+    if passing_dyn3:
+        model_file = parent_file
+    else:
+        fbdyn1 = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(parent_file)}/{parent_file}.bin', 'rb').read()
+        dyn2 = gf.get_file_from_hash(bytes.hex(fbdyn1[0xB0:0xB0+4]))
+        fbdyn2 = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(dyn2)}/{dyn2}.bin', 'rb').read()
+        offset = gf.get_uint16(fbdyn2, 0x18) + 572
+        model_file = gf.get_file_from_hash(bytes.hex(fbdyn2[offset:offset + 4]))
     fbdyn3 = open(f'I:/d2_output_3_0_1_3/{gf.get_pkg_name(model_file)}/{model_file}.bin', 'rb').read()
     # print(f'Parent file {model_file}')
     pos_verts_files, uv_verts_files, faces_files = get_verts_faces_files(model_file)
@@ -768,6 +771,7 @@ def save_texture_plates(dyn1, all_file_info, temp_direc, b_temp_direc_full, b_he
     if not ret:  # Is a tex plate but just nothing in it
         print('Nothing in texture plate')
         return
+    print(texplateset.topfile, texplateset.plates['diffuse'].file)
     if b_temp_direc_full:
         texplateset.export_texture_plate_set(f'{temp_direc}/texplate', b_helmet)
     else:
@@ -835,7 +839,7 @@ def export_all_models(pkg_name, all_file_info, select, lod):
         # if file == '01B5-1666':
         #     a = 0
         print(f'Getting file {file}')
-        get_model(file, all_file_info, lod, temp_direc=f'{select}/' + pkg_name)
+        get_model(file, all_file_info, lod, temp_direc=f'{select}/' + pkg_name, passing_dyn3=True)
 
 
 if __name__ == '__main__':
@@ -848,9 +852,9 @@ if __name__ == '__main__':
     parent_file = '0170-0B97'  # Activity sword
     parent_file = '01B8-08C6'  # Atraks
 
-    get_model(parent_file, all_file_info, lod=True, b_textures=True)
-    quit()
-    select = 'combatants'
+    # get_model(parent_file, all_file_info, lod=True, b_textures=True)
+    # quit()
+    select = 'edz'
     folder = select
     # folder = 'gambit'
     gf.mkdir(f'I:/dynamic_models/{folder}')
