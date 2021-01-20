@@ -898,15 +898,15 @@ def parse_skin_buffer(verts_file, skin_file):
             chunk_index = int(weight_offset / 4)
             stride_index = int(i / 4)
 
-            if k not in skin_data.keys():
-                skin_data[k] = {
+            if stride_index not in skin_data.keys():
+                skin_data[stride_index] = {
                     'index': k,
                     'stride_index': stride_index,
                     'count': 0,
                     'indices': [],
                     'weights': [],
                 }
-            chunk_data = skin_data[k]
+            chunk_data = skin_data[chunk_index]
 
             if index0 != weight0:
                 is_header = False
@@ -929,20 +929,65 @@ def parse_skin_buffer(verts_file, skin_file):
                 if chunk_weight == 255:
                     chunk_weight = 0
                     k += 1
-            if not chunk_data['indices']:
-                del skin_data[k]
+                elif chunk_weight > 255:
+                    raise Exception('Weights > 255')
+            # if not chunk_data['indices']:
+            #     del skin_data[stride_index]
             # else:
             #     k += 1
-
+    with open('skeltdyn.txt', 'w') as f:
+        for x, y in skin_data.items():
+            f.write(f'{y}\n')
+    last_blend_value = 0
+    last_blend_count = 0
     for i, w in enumerate(verts_w):
-        if 0 <= w <= 255:  # One weight
-            out_weights.append([[w], [1.0]])
-        elif w > 0:  # Two weights
-            out_weights.append([skin_data[i]['indices'], skin_data[i]['weights']])
-        elif w < 0:  # Three or four weights
-            out_weights.append([skin_data[i]['indices'], skin_data[i]['weights']])
+        indices = [0, 0, 0, 0]
+        weights = [1, 0, 0, 0]
+
+        blend_index = w & 0x7ff
+        blend_flags = w & 0xf800
+
+        total_bones = 0
+        buffer_size = 0
+
+        if blend_flags == 0:
+            indices[0] = blend_index
+            total_bones = 1
+        elif blend_flags == 0x800:
+            buffer_size = 2
+        elif blend_flags == 0xf000:
+            blend_index = abs(w) & 0x7ff
+            buffer_size = 4
         else:
             raise Exception('Incorrect skin data')
+
+        blend_count = 0
+        if buffer_size > 0:
+            if last_blend_value != blend_index:
+                last_blend_count = 0
+            last_blend_value = blend_index
+
+            u = blend_index + last_blend_count
+            blend_data = skin_data[blend_index * 8 + last_blend_count]
+            a = 0
+            while blend_data['count'] == 0:
+                last_blend_count += 1
+                blend_data = skin_data[blend_index * 8 + last_blend_count]
+            q = blend_index + last_blend_count
+            a = 0
+            total_bones = blend_data['count']
+            for i in range(blend_data['count']):
+                indices[i] = blend_data['indices'][i]
+                weights[i] = blend_data['weights'][i]
+
+            if total_bones > 2:
+                blend_count = 2
+            else:
+                blend_count = 1
+
+        last_blend_count += blend_count
+
+        out_weights.append([[x for x in indices if x != 0], [x for x in weights if x != 0]])
 
     return out_weights
 
@@ -1081,9 +1126,9 @@ if __name__ == '__main__':
 
     parent_file = '01B8-0118'  # Riven
 
-    parent_file = '0157-06DE'
+    parent_file = '01B8-08C6'
 
-    get_model(parent_file, all_file_info, lod=True, b_textures=False, passing_dyn3=True, skel_file='0186-138F')
+    get_model(parent_file, all_file_info, lod=True, b_textures=False, passing_dyn3=False, skel_file='01B8-08D6')
     quit()
     select = 'edz'
     folder = select
