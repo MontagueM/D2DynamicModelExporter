@@ -41,11 +41,11 @@ def get_skeleton(file, names):
     offset = fbin.find(b'\x42\x86\x80\x80')
     if offset == -1:
         raise Exception('Not valid file')
-    c = gf.get_uint32(fbin, offset-8)
-    if c <= 4:
-        print(f'Skeleton broken for file {file}')
-        return []
-    offset -=  0x88
+    # c = gf.get_uint32(fbin, offset-8)
+    # if c <= 4:
+    #     print(f'Skeleton broken for file {file}')
+    #     return []
+    offset -= 0x88
     nodes_size = gf.get_uint32(fbin, offset)
     if nodes_size > 1000:
         print(f'Skeleton broken for file {file}')
@@ -72,15 +72,18 @@ def get_skeleton(file, names):
         nodes.append(node)
 
     # default_object_space_transforms
-    for a, i in enumerate(range(dost_offset, dost_offset + 0x20 * dost_size, 0x20)):
-        node = nodes[a]
-        node.dost = DefaultObjectSpaceTransform()
-        node.dost.rotation = [struct.unpack('f', fbin[i + j:i + j + 4])[0] for j in range(0, 0x10, 0x4)]
-        node.dost.rotation = [node.dost.rotation[0], node.dost.rotation[1], node.dost.rotation[2],
-                              node.dost.rotation[3]]
-        node.dost.location = [struct.unpack('f', fbin[i + j:i + j + 4])[0] for j in range(0x10, 0x1C, 0x4)]
-        node.dost.scale = struct.unpack('f', fbin[i + 0x1C:i + 0x1C + 4])[0]
-
+    try:
+        for a, i in enumerate(range(dost_offset, dost_offset + 0x20 * dost_size, 0x20)):
+            node = nodes[a]
+            node.dost = DefaultObjectSpaceTransform()
+            node.dost.rotation = [struct.unpack('f', fbin[i + j:i + j + 4])[0] for j in range(0, 0x10, 0x4)]
+            node.dost.rotation = [node.dost.rotation[0], node.dost.rotation[1], node.dost.rotation[2],
+                                  node.dost.rotation[3]]
+            node.dost.location = [struct.unpack('f', fbin[i + j:i + j + 4])[0] for j in range(0x10, 0x1C, 0x4)]
+            node.dost.scale = struct.unpack('f', fbin[i + 0x1C:i + 0x1C + 4])[0]
+    except struct.error:
+        print('Skeleton broken')
+        return []
     # default_inverse_object_space_transforms
     for a, i in enumerate(range(diost_offset, diost_offset + 0x20 * diost_size, 0x20)):
         node = nodes[a]

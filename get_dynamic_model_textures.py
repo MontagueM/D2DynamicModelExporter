@@ -62,7 +62,7 @@ def get_header(file_hex, header):
 
 
 test_dir = 'I:/d2_output_3_0_2_0'
-
+bad_files = []
 
 # def get_referenced_file(file):
 #     pkg_name = get_pkg_name(file)
@@ -751,7 +751,7 @@ def adjust_faces_data(faces_data, max_vert_used):
 
 
 def get_model(parent_file, all_file_info, lod, temp_direc='', b_textures=False, b_temp_direc_full=False, obfuscate=False, b_apply_textures=False, passing_dyn3=False, b_skeleton=False, from_api=False, b_shaders=False):
-    b_verbose = True
+    b_verbose = False
     model = pfb.Model()
     model_files = []
     existing_mats = {}
@@ -892,7 +892,7 @@ def add_to_fbx(model, bones, submeshes, model_file, name, temp_direc, b_temp_dir
 
 
 def parse_skin_buffer(verts_file, skin_file):
-    if not skin_file:
+    if not skin_file:# or True:
         return
 
     out_weights = []
@@ -971,29 +971,27 @@ def parse_skin_buffer(verts_file, skin_file):
         blend_index = w & 0x7ff
         blend_flags = w & 0xf800
 
-        total_bones = 0
         buffer_size = 0
 
-        if blend_flags == 0:
-            indices[0] = blend_index
-            total_bones = 1
-        elif blend_flags == 0x800:
-            buffer_size = 2
-        elif blend_flags & 0x8000:
+        if blend_flags & 0x8000:
             blend_index = abs(w) - 2048
             buffer_size = 4
+        elif blend_flags == 0x800:
+            buffer_size = 2
+        elif blend_flags & 0x1000:
+            buffer_size = 2
+            blend_index = abs(w) - 2048
+        elif blend_flags == 0:
+            indices[0] = blend_index
         else:
-            raise Exception('Incorrect skin data')
-
-        if blend_flags == 0xe800:
-            a = 0
+            raise Exception('Unk flag used in skin buffer')
+            # raise Exception('Incorrect skin data')
 
         blend_count = 0
         if buffer_size > 0:
             if last_blend_value != blend_index:
                 last_blend_count = 0
             last_blend_value = blend_index
-
 
             blend_data = skin_data[blend_index * 8 + last_blend_count]
             while blend_data['count'] == 0:
@@ -1083,20 +1081,6 @@ def save_texture_plates(dyn1, all_file_info, temp_direc, b_temp_direc_full, subm
             s.diffuse = f'{sn}_diffuse'
 
 
-# def scale_verts(verts_data, model_file):
-#     return verts_data
-#     pkg_name = gf.get_pkg_name(model_file)
-#     model_hex = gf.get_hex_data(f'{test_dir}/{pkg_name}/{model_file}.bin')
-#     # TODO fix this, this isn't correct but it is needed.
-#     model_scale = [struct.unpack('f', bytes.fromhex(model_hex[j:j + 8]))[0] for j in range(0x70*2, (0x70+12)*2, 8)]
-#
-#     for i in range(len(verts_data)):
-#         for j in range(3):
-#             verts_data[i][j] *= model_scale[j]
-#
-#     return verts_data
-
-
 def create_mesh(model, submesh: Submesh, name, skel_file):
     mesh = fbx.FbxMesh.Create(model.scene, name)
     if skel_file:
@@ -1127,18 +1111,6 @@ def create_uv(mesh, name, submesh: Submesh, layer):
         uvDiffuseLayerElement.GetDirectArray().Add(fbx.FbxVector2(p[0], p[1]))
     layer.SetUVs(uvDiffuseLayerElement, fbx.FbxLayerElement.eTextureDiffuse)
     return layer
-
-# #
-#
-# def create_uv(mesh, name, submesh: met.Submesh, layer):
-#     uvDiffuseLayerElement = fbx.FbxLayerElementUV.Create(mesh, f'diffuseUV {name}')
-#     uvDiffuseLayerElement.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
-#     uvDiffuseLayerElement.SetReferenceMode(fbx.FbxLayerElement.eDirect)
-#     # mesh.InitTextureUV()
-#     for i, p in enumerate(submesh.uv_verts):
-#         uvDiffuseLayerElement.GetDirectArray().Add(fbx.FbxVector2(p[0], p[1]))
-#     layer.SetUVs(uvDiffuseLayerElement, fbx.FbxLayerElement.eTextureDiffuse)
-#     return layer
 
 
 def export_all_models(pkg_name, all_file_info, select, lod_filter, b_textures):
@@ -1174,8 +1146,15 @@ if __name__ == '__main__':
 
     parent_file = '01B6-0C3A'  # wyvern, skel file 01C2-0AF7  ? 01B6-0C47
 
-    parent_file = '0157-04BB'  # broken drifter
+    parent_file = '0157-04BB'  # broken drifter (fixed)
+    parent_file = '0159-0CB7'  # variks broken 4096
+    # parent_file = '01B5-10DB'  # unstoppable ogre broken 4096, old file is, skel file is '01B6-09D9' new,
+    # parent_file = '01B5-14DA'  # unstoppable incendior cabal dude broken 4096, old file is
+    # parent_file = '01B5-1602'  # barrier knight broken 4096
+    # parent_file = '01B6-02A5'  # incendior shield with the broken back and '01B6-02A8' and 02b7 02ba 02dd
+    # parent_file = '0158-052A'  # eris broken, new is 0158-052A dyn1, old is prob 0938-00B9
 
+    parent_file = '01B8-08C6'
     get_model(parent_file, all_file_info, temp_direc=parent_file, lod=True, b_textures=False, passing_dyn3=False, b_skeleton=True)
     quit()
 
@@ -1187,3 +1166,4 @@ if __name__ == '__main__':
             # if pkg not in os.listdir('C:/d2_model_temp/texture_models/tower'):
             export_all_models(pkg, all_file_info, folder, lod_filter=True, b_textures=False)
 
+    print(bad_files)
