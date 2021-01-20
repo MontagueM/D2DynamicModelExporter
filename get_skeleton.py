@@ -38,10 +38,18 @@ def get_skeleton(file, names):
     default_inverse_object_space_transforms is diost
     """
     fbin = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(file)}/{file}.bin', 'rb').read()
-    offset = fbin.find(b'\x42\x86\x80\x80') - 0x88
-    if offset == -0x89:
+    offset = fbin.find(b'\x42\x86\x80\x80')
+    if offset == -1:
         raise Exception('Not valid file')
+    c = gf.get_uint32(fbin, offset-8)
+    if c <= 4:
+        print(f'Skeleton broken for file {file}')
+        return []
+    offset -=  0x88
     nodes_size = gf.get_uint32(fbin, offset)
+    if nodes_size > 1000:
+        print(f'Skeleton broken for file {file}')
+        return []
     nodes_offset = gf.get_uint32(fbin, offset + 0x8) + offset + 0x8 + 0x10
     dost_size = gf.get_uint32(fbin, offset + 0x10)
     dost_offset = gf.get_uint32(fbin, offset + 0x18) + offset + 0x18 + 0x10

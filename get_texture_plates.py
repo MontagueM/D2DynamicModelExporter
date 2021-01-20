@@ -40,10 +40,13 @@ class TexturePlateSet:
 
         return {'diffuse': a, 'normal': b, 'gstack': c, 'dyemap': d}
 
-    def export_texture_plate_set(self, save_dir, b_helmet):
+    def export_texture_plate_set(self, save_dir, altname=None):
         # We'll append _diffuse.png, _normal.png, _gstack.png to the save_dir per set
         for type, plate in self.plates.items():
-            plate.export_plate(f'{save_dir}_{type}.png', b_helmet)
+            if altname:
+                plate.export_plate(f'{save_dir}/{altname}_{type}.png')
+            else:
+                plate.export_plate(f'{save_dir}/{type}.png')
 
 
 class TexturePlate:
@@ -75,14 +78,11 @@ class TexturePlate:
             # Resizing
             tex.image = tex.image.resize([tex.resizex, tex.resizey])
 
-    def export_plate(self, save_dir, b_helmet):
-        b_helmet
+    def export_plate(self, save_dir):
         if self.type == 'dyemap':
             dimensions = [1024, 1024]
         else:
             dimensions = [2048, 2048]
-        if b_helmet:
-            dimensions = [int(x/2) for x in dimensions]
         bg_plate = Image.new('RGBA', dimensions, (0, 0, 0, 0))  # Makes a transparent image as alpha = 0
         for tex in self.textures:
             bg_plate.paste(tex.image, [tex.platex, tex.platey])
