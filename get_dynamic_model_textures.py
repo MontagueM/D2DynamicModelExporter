@@ -487,7 +487,7 @@ def scale_and_repos_uv_verts(verts_data, fbin):
 
 def export_fbx(model, submeshes, model_file, name, temp_direc, b_temp_direc_full, b_apply_textures, skel_file, bones):
     for submesh in submeshes:
-        mesh = create_mesh(model, submesh, name)
+        mesh = create_mesh(model, submesh, name, skel_file)
         if not mesh.GetLayer(0):
             mesh.CreateLayer()
         layer = mesh.GetLayer(0)
@@ -797,9 +797,8 @@ def adjust_faces_data(faces_data, max_vert_used):
 
 def get_model(parent_file, all_file_info, lod, temp_direc='', b_textures=False, b_temp_direc_full=False, b_helmet=False, b_apply_textures=False, passing_dyn3=False, skel_file=None):
     model = pfb.Model()
-
     if passing_dyn3:
-        model_file = parent_file
+        raise Exception('Dyn3 no longer supported')
     else:
         fbdyn1 = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(parent_file)}/{parent_file}.bin', 'rb').read()
         dyn2 = gf.get_file_from_hash(bytes.hex(fbdyn1[0xB0:0xB0+4]))
@@ -1060,9 +1059,12 @@ def save_texture_plates(dyn1, all_file_info, temp_direc, b_temp_direc_full, b_he
 #     return verts_data
 
 
-def create_mesh(model, submesh: Submesh, name):
+def create_mesh(model, submesh: Submesh, name, skel_file):
     mesh = fbx.FbxMesh.Create(model.scene, name)
-    controlpoints = [fbx.FbxVector4(-x[0], x[2], x[1]) for x in submesh.pos_verts]
+    if skel_file:
+        controlpoints = [fbx.FbxVector4(-x[0] * 100, x[2] * 100, x[1] * 100) for x in submesh.pos_verts]
+    else:
+        controlpoints = [fbx.FbxVector4(-x[0], x[2], x[1]) for x in submesh.pos_verts]
     for i, p in enumerate(controlpoints):
         mesh.SetControlPointAt(p, i)
     for face in submesh.faces:
