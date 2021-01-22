@@ -43,7 +43,7 @@ def get_armour_from_api(api_hash, strinfo, mass=False, byte=False):
             temp_direc = f'apinamed/api_{apiname}'
         else:
             temp_direc = f'api_{apiname}'
-        dme.get_model(dyn1, all_file_info, lod_filter, temp_direc=temp_direc, passing_dyn3=False, obfuscate=False, b_apply_textures=True,
+        dme.get_model(dyn1, all_file_info, hash64_table, lod=lod_filter, temp_direc=temp_direc, passing_dyn3=False, obfuscate=False, b_apply_textures=True,
                   b_shaders=False, b_textures=True, jud_shader=False, from_api=True, b_skeleton=True)
 
 
@@ -85,7 +85,7 @@ def get_weapon_from_api(api_hash, strinfo, mass=False, byte=False):
                 temp_direc = f'apinamed/api_{apiname}'
             else:
                 temp_direc = f'api_{apiname}'
-            dme.get_model(dyn1, all_file_info, lod_filter, temp_direc=temp_direc, passing_dyn3=False, obfuscate=True, b_apply_textures=True,
+            dme.get_model(dyn1, all_file_info, hash64_table, lod=lod_filter, temp_direc=temp_direc, passing_dyn3=False, obfuscate=True, b_apply_textures=True,
                       b_shaders=False, b_textures=True, from_api=True, jud_shader=True, b_skeleton=True)
 
 
@@ -134,17 +134,17 @@ if __name__ == '__main__':
     # Moonfang cloak 2701727616 (cloaks dont get exported)
     # Moonfang crown 2288398391
     api_hash = 2702372534
-    get_armour_from_api(api_hash, strinfo)
+    # get_armour_from_api(api_hash, strinfo)
 
     # Trials auto 1909527966
     # Ace of spades 347366834
     # Eystein-D (lots of sights) 1291586825
     # Cold denial 1216130969
 
-    # api_hash = 1650442173
-    # get_weapon_from_api(api_hash, strinfo)
+    api_hash = 1650442173
+    get_weapon_from_api(api_hash, strinfo)
 
     api_hash = 1839565992
-    # get_weapon_from_api(api_hash, strinfo)
+    get_weapon_from_api(api_hash, strinfo)
 
     # mass_export(strinfo)

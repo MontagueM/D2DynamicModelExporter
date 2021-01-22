@@ -890,7 +890,7 @@ def add_to_fbx(model, bones, submeshes, parent_file, name, temp_direc, b_temp_di
             add_vert_colours(mesh, parent_file, submesh, layer)
 
         if b_shaders or b_textures:
-            try_get_material_textures(submesh, temp_direc, b_apply_textures, hash64_table)
+            try_get_material_textures(submesh, temp_direc, b_apply_textures, hash64_table, all_file_info)
 
         if b_shaders:
             pass
@@ -905,7 +905,7 @@ def add_to_fbx(model, bones, submeshes, parent_file, name, temp_direc, b_temp_di
             add_weights(model, mesh, name, submesh.weights, bones)
 
 
-def try_get_material_textures(submesh, temp_direc, b_apply_textures, hash64_table):
+def try_get_material_textures(submesh, temp_direc, b_apply_textures, hash64_table, all_file_info):
     if submesh.material.uid == 'FFFFFFFF':
         with open(f'I:/dynamic_models/{temp_direc}/textures/tex.txt', 'a') as f:
             f.write(f'Submesh {submesh.name} textures: no material\n')
@@ -957,7 +957,7 @@ def parse_skin_buffer(verts_file, all_file_info, skin_file):
     skin_header = []
     skin_data = {}
     k = 0
-    if skin_fb:
+    if skin_fb and any([x & 0xf800 != 0 for x in verts_w]):  # Checking if the whole file is just a header or not
         is_header = False
         past_header = False
         chunk_weight = 0

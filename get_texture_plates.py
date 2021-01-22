@@ -61,6 +61,13 @@ class TexturePlate:
         fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(self.file)}/{self.file}.bin', 'rb').read()
         file_count = gf.get_uint16(fb, 0x30)
         table_offset = 0x40
+        dimension_flag = fb[0xA]
+
+        if dimension_flag == 0:
+            self.dimensions = [2048, 2048]
+        else:
+            self.dimensions = [1024, 1024]
+
         for i in range(table_offset, table_offset+file_count*20, 20):
             tex = Texture()
             tex.tex_header = gf.get_file_from_hash(bytes.hex(fb[i:i+4]).upper())
@@ -80,10 +87,8 @@ class TexturePlate:
 
     def export_plate(self, save_dir):
         if self.type == 'dyemap':
-            dimensions = [1024, 1024]
-        else:
-            dimensions = [2048, 2048]
-        bg_plate = Image.new('RGBA', dimensions, (0, 0, 0, 0))  # Makes a transparent image as alpha = 0
+            self.dimensions = [int(x/2) for x in self.dimensions]
+        bg_plate = Image.new('RGBA', self.dimensions, (0, 0, 0, 0))  # Makes a transparent image as alpha = 0
         for tex in self.textures:
             bg_plate.paste(tex.image, [tex.platex, tex.platey])
         bg_plate.save(save_dir)
