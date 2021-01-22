@@ -377,7 +377,7 @@ def trim_verts_data(verts_data, faces_data):
     return verts_data[min(all_v)-1:max(all_v)]
 
 
-def get_submeshes(file, index, pos_verts, uv_verts, weights, vert_colours, face_hex):
+def get_submeshes(file, index, pos_verts, uv_verts, weights, vert_colours, face_hex, jud_shader):
     # faces_ = faces
     # Getting the submesh table entries
     fbin = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(file)}/{file}.bin', 'rb').read()
@@ -451,7 +451,6 @@ def get_submeshes(file, index, pos_verts, uv_verts, weights, vert_colours, face_
         else:
             submesh.weights = []
 
-        jud_shader = False
         if vert_colours:
             submesh.vert_colours = trim_verts_data(vert_colours, smfaces)
             # print('Vert colours true')
@@ -767,7 +766,7 @@ def adjust_faces_data(faces_data, max_vert_used):
     return new_faces_data, max(all_v)
 
 
-def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True, b_textures=False, b_temp_direc_full=False, obfuscate=False, b_apply_textures=False, passing_dyn3=False, b_skeleton=False, from_api=False, b_shaders=False):
+def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True, b_textures=False, b_temp_direc_full=False, obfuscate=False, b_apply_textures=False, passing_dyn3=False, b_skeleton=False, from_api=False, b_shaders=False, jud_shader=False):
     b_verbose = False
     model = pfb.Model()
     model_files = []
@@ -836,12 +835,12 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
                     uv_verts = []
 
                 if i < len(skin_buffer_files):
-                    weights = parse_skin_buffer(pos_vert_file, skin_buffer_files[i])
+                    weights = parse_skin_buffer(pos_vert_file, all_file_info, skin_buffer_files[i])
                 else:
                     print('No weights or weights are in a supplementary file')
 
                 face_hex = get_face_hex(faces_file, all_file_info)
-                submeshes = get_submeshes(model_file, i, pos_verts, uv_verts, weights, vert_colours, face_hex)
+                submeshes = get_submeshes(model_file, i, pos_verts, uv_verts, weights, vert_colours, face_hex, jud_shader)
                 first_mat = None
                 submeshes_to_write = []
                 for submesh in submeshes:
@@ -868,7 +867,7 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
         export_fbx(b_temp_direc_full, model, temp_direc, parent_file, obfuscate)
 
 
-def add_to_fbx(model, bones, submeshes, model_file, name, temp_direc, b_temp_direc_full, b_apply_textures, b_textures, skel_file, obfuscate, existing_mats, b_shaders, all_file_info, b_verbose, hash64_table):
+def add_to_fbx(model, bones, submeshes, parent_file, name, temp_direc, b_temp_direc_full, b_apply_textures, b_textures, skel_file, obfuscate, existing_mats, b_shaders, all_file_info, b_verbose, hash64_table):
     if obfuscate:
         name = str(hashlib.md5(name.encode()).hexdigest())[:8]
 
@@ -886,9 +885,9 @@ def add_to_fbx(model, bones, submeshes, model_file, name, temp_direc, b_temp_dir
         node.LclScaling.Set(fbx.FbxDouble3(100, 100, 100))
 
         if submesh.uv_verts:
-            create_uv(mesh, model_file, submesh, layer)
+            create_uv(mesh, parent_file, submesh, layer)
         if submesh.vert_colours:
-            add_vert_colours(mesh, model_file, submesh, layer)
+            add_vert_colours(mesh, parent_file, submesh, layer)
 
         if b_shaders or b_textures:
             try_get_material_textures(submesh, temp_direc, b_apply_textures, hash64_table)
@@ -943,7 +942,7 @@ def try_get_material_textures(submesh, temp_direc, b_apply_textures, hash64_tabl
 
 
 
-def parse_skin_buffer(verts_file, skin_file):
+def parse_skin_buffer(verts_file, all_file_info, skin_file):
     if not skin_file:# or True:
         return
 
@@ -959,7 +958,8 @@ def parse_skin_buffer(verts_file, skin_file):
     skin_data = {}
     k = 0
     if skin_fb:
-        is_header = True
+        is_header = False
+        past_header = False
         chunk_weight = 0
         weight_offset = 0
         for i in range(0, len(skin_fb), 4):
@@ -986,11 +986,18 @@ def parse_skin_buffer(verts_file, skin_file):
                 }
             chunk_data = skin_data[chunk_index]
 
-            if index0 != weight0:
-                is_header = False
-            if is_header:
-                skin_header = [index0, index1, weight0, weight1]
-            elif skin_vertex == 0:
+            if is_header and i % 32 != 0 and not past_header:
+                continue
+            if index0 == weight0 and not past_header:
+                is_header = True
+                continue
+            else:
+                past_header = True
+            # if is_header:
+            #     skin_header = [index0, index1, weight0, weight1]  # We want to skip ahead 8 here as its useless
+            #     # k += 1
+            #     # continue
+            if skin_vertex == 0:
                 pass
             else:
                 for w in [weight0, weight1]:
@@ -1210,7 +1217,7 @@ if __name__ == '__main__':
     # parent_file = '01B6-02A5'  # incendior shield with the broken back and '01B6-02A8' and 02b7 02ba 02dd
     # parent_file = '0158-052A'  # eris broken, new is 0158-052A dyn1, old is prob 0938-00B9
 
-    parent_file = '01B8-08C6'
+    parent_file = '0190-0AEB'
     get_model(parent_file, all_file_info, hash64_table, temp_direc=parent_file, lod=True, b_textures=True, b_apply_textures=True, passing_dyn3=False, b_skeleton=True)
     quit()
 
