@@ -7,8 +7,7 @@ c = None
 def start_db_connection(version):
     global con
     global c
-    print(version)
-    con = sq.connect(f'I:/d2_pkg_db/{version}.db')
+    con = sq.connect(version)
     c = con.cursor()
 
 
