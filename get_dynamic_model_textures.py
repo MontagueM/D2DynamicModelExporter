@@ -12,6 +12,7 @@ import get_texture_plates as gtp
 import get_skeleton
 import hashlib
 import image_extractor as imager  # Blender
+import copy
 
 
 @dataclass
@@ -58,6 +59,8 @@ class HeaderFile(File):
             if not self.name:
                 self.name = gf.get_file_from_hash(self.uid)
             pkg_name = gf.get_pkg_name(self.name)
+            if not pkg_name:
+                return None
             header_hex = gf.get_hex_data(f'{test_dir}/{pkg_name}/{self.name}.bin')
             return get_header(header_hex, Stride12Header())
 
@@ -370,11 +373,12 @@ class SubmeshEntryProper:
 
 
 def trim_verts_data(verts_data, faces_data):
+    # return verts_data
     all_v = []
     for face in faces_data:
         for v in face:
             all_v.append(v)
-    return verts_data[min(all_v)-1:max(all_v)]
+    return verts_data[min(all_v):max(all_v)+1]
 
 
 def get_submeshes(file, index, pos_verts, uv_verts, weights, vert_colours, face_hex, jud_shader):
@@ -475,6 +479,7 @@ def get_submeshes(file, index, pos_verts, uv_verts, weights, vert_colours, face_
             a = 0
         alt = shift_faces_down(smfaces)
         submesh.faces = alt
+        # submesh.faces = smfaces
         existing[submesh.entry.IndexOffset] = submesh.lod_level
 
     return submeshes
@@ -485,10 +490,10 @@ def get_faces(submesh: Submesh, faces_hex, stride):
     increment = 3
     face_dict = {}
     if stride == 8:
-        int_faces_data = [int(gf.get_flipped_hex(faces_hex[i:i + 8], 8), 16) + 1 for i in
+        int_faces_data = [int(gf.get_flipped_hex(faces_hex[i:i + 8], 8), 16) for i in
                            range(0, len(faces_hex), 8)]
     else:
-        int_faces_data = [int(gf.get_flipped_hex(faces_hex[i:i + 4], 4), 16) + 1 for i in
+        int_faces_data = [int(gf.get_flipped_hex(faces_hex[i:i + 4], 4), 16) for i in
                            range(0, len(faces_hex), 4)]
     if submesh.type == 5:
         increment = 1
@@ -507,7 +512,7 @@ def get_faces(submesh: Submesh, faces_hex, stride):
         elif face_index == len(int_faces_data) and submesh.type == 3:
             face_dict[face_index] = len(faces) - 1
             break
-        if 65536 in int_faces_data[face_index:face_index+3] or 4294967296 in int_faces_data[face_index:face_index+3]:
+        if 65535 in int_faces_data[face_index:face_index+3] or 4294967295 in int_faces_data[face_index:face_index+3]:
             j = 0
             face_dict[face_index] = len(faces) - 1
             face_index += increment
@@ -652,7 +657,7 @@ def get_submesh_faces(submesh, faces, face_dict):
     # a = faces[io:ic]
     # if not a:
     #     k = 0
-    return faces[io:ic]
+    return copy.deepcopy(faces[io:ic])
 
 
 def get_face_hex(faces_file, all_file_info) -> str:
@@ -685,6 +690,7 @@ def get_verts_faces_files(model_file):
     pos_verts_files = []
     uv_verts_files = []
     faces_files = []
+    original_weight_files = []
     skin_buffer_files = []
     pkg_name = gf.get_pkg_name(model_file)
     try:
@@ -698,26 +704,29 @@ def get_verts_faces_files(model_file):
         rel_hex = model_data_hex[192*2+128*2*i:192*2+128*2*(i+1)]
         for j in range(0, len(rel_hex), 8):
             hsh = rel_hex[j:j+8]
-            if hsh != 'FFFFFFFF':
-                hf = HeaderFile()
-                hf.uid = hsh
-                hf.name = gf.get_file_from_hash(hf.uid)
-                hf.pkg_name = gf.get_pkg_name(hf.name)
-                if j == 0:
-                    hf.header = hf.get_header()
-                    # print(f'Position file {hf.name} stride {hf.header.StrideLength}')
-                    pos_verts_files.append(hf)
-                elif j == 8:
-                    hf.header = hf.get_header()
-                    # print(f'UV file {hf.name} stride {hf.header.StrideLength}')
-                    uv_verts_files.append(hf)
-                elif j == 32:
-                    faces_files.append(hf)
-                elif j == 48:
-                    skin_buffer_files.append(hf)
-                    break
+            # if hsh != 'FFFFFFFF':
+            hf = HeaderFile()
+            hf.uid = hsh
+            hf.name = gf.get_file_from_hash(hf.uid)
+            hf.pkg_name = gf.get_pkg_name(hf.name)
+            if j == 0:
+                hf.header = hf.get_header()
+                # print(f'Position file {hf.name} stride {hf.header.StrideLength}')
+                pos_verts_files.append(hf)
+            elif j == 8:
+                hf.header = hf.get_header()
+                # print(f'UV file {hf.name} stride {hf.header.StrideLength}')
+                uv_verts_files.append(hf)
+            elif j == 16:
+                hf.header = hf.get_header()
+                original_weight_files.append(hf)
+            elif j == 32:
+                faces_files.append(hf)
+            elif j == 48:
+                skin_buffer_files.append(hf)
+                break
     # print(pos_verts_files, uv_verts_files)
-    return pos_verts_files, uv_verts_files, faces_files, skin_buffer_files
+    return pos_verts_files, uv_verts_files, faces_files, skin_buffer_files, original_weight_files
 
 
 # def get_lod_0_faces(model_file, num):
@@ -745,7 +754,7 @@ def shift_faces_down(faces_data):
                 a_min = i
     for i, f in enumerate(faces_data):
         for j, x in enumerate(f):
-            faces_data[i][j] -= a_min - 1
+            faces_data[i][j] -= a_min
     return faces_data
 
 
@@ -814,7 +823,7 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
                 continue
             fbdyn3 = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(model_file)}/{model_file}.bin', 'rb').read()
             # print(f'Parent file {model_file}')
-            pos_verts_files, uv_verts_files, faces_files, skin_buffer_files = get_verts_faces_files(model_file)
+            pos_verts_files, uv_verts_files, faces_files, skin_buffer_files, og_weight_files = get_verts_faces_files(model_file)
 
             if skel_file:
                 bones = add_skeleton(model, skel_file)
@@ -824,20 +833,21 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
             for i, pos_vert_file in enumerate(pos_verts_files):
                 weights = []
                 vert_colours = []
+                uv_verts = []
                 faces_file = faces_files[i]
                 pos_verts = get_verts_data(pos_vert_file, all_file_info, is_uv=False)
 
                 pos_verts = scale_and_repos_pos_verts(pos_verts, fbdyn3)
-                if i < len(uv_verts_files):
+                if uv_verts_files[i].uid != 'FFFFFFFF':
                     uv_verts = get_verts_data(uv_verts_files[i], all_file_info, is_uv=True)
                     uv_verts = scale_and_repos_uv_verts(uv_verts, fbdyn3)
-                else:
-                    uv_verts = []
 
-                if i < len(skin_buffer_files):
+                if og_weight_files[i].uid != 'FFFFFFFF':
+                    weights = get_og_weights(all_file_info, og_weight_files[i])
+                elif skin_buffer_files[i].uid != 'FFFFFFFF':
                     weights = parse_skin_buffer(pos_vert_file, all_file_info, skin_buffer_files[i])
                 else:
-                    print('No weights or weights are in a supplementary file')
+                    print('No weights')
 
                 face_hex = get_face_hex(faces_file, all_file_info)
                 submeshes = get_submeshes(model_file, i, pos_verts, uv_verts, weights, vert_colours, face_hex, jud_shader)
@@ -865,6 +875,18 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
         #         print('Collecting extra textures...')
         #     collect_extra_textures(open(f'I:/d2_output_3_0_2_0//{gf.get_pkg_name(dyn2_primary)}/{dyn2_primary}.bin', 'rb').read(), temp_direc, b_verbose)
         export_fbx(b_temp_direc_full, model, temp_direc, parent_file, obfuscate)
+
+
+def get_og_weights(all_file_info, og_weight_file):
+    weights_pairs = []
+    ref_file = gf.get_file_from_hash(all_file_info[og_weight_file.name]['Reference'])
+    fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(ref_file)}/{ref_file}.bin', 'rb').read()
+    for i in range(0, len(fb), 8):
+        weights = [x/255 for x in fb[i:i+4]]
+        weight_indices = [x for x in fb[i+4:i + 8] if x != 254]
+        weights = weights[:len(weight_indices)]
+        weights_pairs.append([weight_indices, weights])
+    return weights_pairs
 
 
 def add_to_fbx(model, bones, submeshes, parent_file, name, temp_direc, b_temp_direc_full, b_apply_textures, b_textures, skel_file, obfuscate, existing_mats, b_shaders, all_file_info, b_verbose, hash64_table):
@@ -1150,9 +1172,9 @@ def create_mesh(model, submesh: Submesh, name, skel_file):
         mesh.SetControlPointAt(p, i)
     for face in submesh.faces:
         mesh.BeginPolygon()
-        mesh.AddPolygon(face[0]-1)
-        mesh.AddPolygon(face[1]-1)
-        mesh.AddPolygon(face[2]-1)
+        mesh.AddPolygon(face[0])
+        mesh.AddPolygon(face[1])
+        mesh.AddPolygon(face[2])
         mesh.EndPolygon()
 
     # node = fbx.FbxNode.Create(d2map.fbx_model.scene, name)
@@ -1217,8 +1239,8 @@ if __name__ == '__main__':
     # parent_file = '01B6-02A5'  # incendior shield with the broken back and '01B6-02A8' and 02b7 02ba 02dd
     # parent_file = '0158-052A'  # eris broken, new is 0158-052A dyn1, old is prob 0938-00B9
 
-    parent_file = '0190-0AEB'
-    get_model(parent_file, all_file_info, hash64_table, temp_direc=parent_file, lod=True, b_textures=True, b_apply_textures=True, passing_dyn3=False, b_skeleton=True)
+    parent_file = '01B8-08C6'
+    get_model(parent_file, all_file_info, hash64_table, temp_direc=parent_file, lod=True, b_textures=True, b_apply_textures=True, passing_dyn3=False, b_skeleton=True, obfuscate=True)
     quit()
 
     select = 'npcs'
