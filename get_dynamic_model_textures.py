@@ -976,7 +976,6 @@ def parse_skin_buffer(verts_file, all_file_info, skin_file):
 
     ref_file = gf.get_file_from_hash(all_file_info[skin_file.name]['Reference'])
     skin_fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(ref_file)}/{ref_file}.bin', 'rb').read()
-    skin_header = []
     skin_data = {}
     k = 0
     if skin_fb and any([x & 0xf800 != 0 for x in verts_w]):  # Checking if the whole file is just a header or not
@@ -1010,7 +1009,7 @@ def parse_skin_buffer(verts_file, all_file_info, skin_file):
 
             if is_header and i % 32 != 0 and not past_header:
                 continue
-            if index0 == weight0 and not past_header:
+            if (index0 == weight0 or index1 == weight1) and not past_header:
                 is_header = True
                 continue
             else:
@@ -1036,7 +1035,7 @@ def parse_skin_buffer(verts_file, all_file_info, skin_file):
                 if chunk_weight == 255:
                     chunk_weight = 0
                     k += 1
-                elif chunk_weight > 255:
+                elif chunk_weight > 255:  # We're in the header. We re-enable the header check.
                     raise Exception('Weights > 255')
 
     with open('skeltdyn.txt', 'w') as f:
