@@ -13,6 +13,7 @@ import get_skeleton
 import hashlib
 import image_extractor as imager  # Blender
 import copy
+import get_shader as shaders
 
 
 @dataclass
@@ -855,7 +856,7 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
             skel_file = ''
 
         if from_api:
-            dyn2_secondary = gf.get_file_from_hash(bytes.hex(fbdyn1[0xBC:0xBC+4]))
+            dyn2_secondary = gf.get_file_from_hash(bytes.hex(fbdyn1[0xBC:0xBC+4]))  # Do we need to modify dyn2_prim as its the same here for api stuff?
         else:
             dyn2_secondary = ''
         dyn2_ternary = gf.get_file_from_hash(bytes.hex(fbdyn1[0xC8:0xC8+4]))
@@ -978,16 +979,92 @@ def add_to_fbx(model, bones, submeshes, parent_file, name, temp_direc, b_temp_di
             try_get_material_textures(submesh, temp_direc, b_apply_textures, hash64_table, all_file_info)
 
         if b_shaders:
-            pass
-            # apply_shader(existing_mats, model, submesh, node, temp_direc, all_file_info)
+            apply_shader(existing_mats, model, submesh, node, temp_direc, all_file_info)
+            print(f'submesh {name} has mat file {submesh.material.name} with textures {submesh.textures}')
+            get_shader_info(submesh, temp_direc)
+
         if b_textures and submesh.diffuse:
             apply_diffuse(model, submesh, node, name, temp_direc, b_temp_direc_full)
+            node.SetShadingMode(fbx.FbxNode.eTextureShading)
 
-        node.SetShadingMode(fbx.FbxNode.eTextureShading)
         model.scene.GetRootNode().AddChild(node)
 
         if skel_file and submesh.weights and bones:
             add_weights(model, mesh, name, submesh.weights, bones)
+
+
+def apply_shader(existing_mats, model, submesh: Submesh, node, temp_direc, all_file_info):
+    submesh.material.get_file_from_uid()
+    lMaterialName = submesh.material.name
+    if lMaterialName in existing_mats.keys():
+        node.AddMaterial(existing_mats[lMaterialName])
+        return
+    lMaterial = fbx.FbxSurfacePhong.Create(model.scene, lMaterialName)
+    existing_mats[lMaterialName] = lMaterial
+    lMaterial.ShadingModel.Set('Phong')
+    node.AddMaterial(lMaterial)
+
+
+def get_shader_info(submesh, temp_direc):
+        cbuffer_offsets, texture_offset = get_mat_tables(submesh.material)
+        if not texture_offset:
+            return
+        shaders.get_shader_from_mat(submesh.material, submesh.textures, cbuffer_offsets, all_file_info, f'I:/dynamic_models/{temp_direc}/shaders/')
+
+
+def get_material_textures(material, texture_offset, hash64_table, all_file_info, custom_dir):
+    material.get_pkg_name()
+    material.get_fb()
+    texture_offset += 8
+    if texture_offset == 15:
+        return []
+    count = gf.get_uint32(material.fb, texture_offset-8)
+    # Arbritrary
+    if count < 0 or count > 100:
+        return []
+    # image_indices = [gf.get_file_from_hash(material.fhex[texture_offset+16+8*(2*i):texture_offset+16+8*(2*i)+8]) for i in range(count)]
+    images = [gf.get_file_from_hash(hash64_table[material.fb[texture_offset+8+0x10+24*i:texture_offset+8+0x10+24*i+8].hex().upper()]) for i in range(count)]
+    if len(images) == 0:
+        return []
+    for img in images:
+        if custom_dir:
+            gf.mkdir(f'{custom_dir}/')
+            if not os.path.exists(f'{custom_dir}/{img}.png'):
+                if img == 'FBFF-1FFF':
+                    continue
+                imager.get_image_from_file(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(img)}/{img}.bin', all_file_info, f'{custom_dir}/')
+    return images
+
+
+def get_mat_tables(material):
+    if material.name == 'FBFF-1FFF':
+        return None, None
+    material.get_pkg_name()
+    material.get_fb()
+    cbuffers = []
+    textures = -1
+
+    texture_offset = 0x2A8
+    table_offset = texture_offset + gf.get_uint32(material.fb, texture_offset)
+    # table_count = int(gf.get_flipped_hex(material.fhex[table_offset:table_offset+8], 8), 16)
+    table_type = material.fb[table_offset + 8:table_offset + 12]
+    if table_type == b'\xCF\x6D\x80\x80':
+        textures = table_offset
+
+    start_offset = 0x2C0
+    for i in range(6):
+        current_offset = start_offset + 16*i
+        table_offset = current_offset + gf.get_uint32(material.fb, current_offset)
+        # table_count = int(gf.get_flipped_hex(material.fhex[table_offset:table_offset+8], 8), 16)
+        table_type = material.fb[table_offset+8:table_offset+12]
+        if table_type == b'\x90\x00\x80\x80':
+            cbuffers.append(table_offset)
+
+    # if textures == -1:
+    #     raise Exception('Texture offset incorrect')
+
+    return cbuffers, textures
+
 
 
 def try_get_material_textures(submesh, temp_direc, b_apply_textures, hash64_table, all_file_info):
@@ -1305,8 +1382,8 @@ if __name__ == '__main__':
     # parent_file = '01B6-02A5'  # incendior shield with the broken back and '01B6-02A8' and 02b7 02ba 02dd
     # parent_file = '0158-052A'  # eris broken, new is 0158-052A dyn1, old is prob 0938-00B9
 
-    parent_file = '0159-1229'
-    get_model(parent_file, all_file_info, hash64_table, temp_direc=parent_file, lod=True, b_textures=True, b_apply_textures=True, passing_dyn3=False, b_skeleton=True, obfuscate=True)
+    parent_file = '0159-0EDC'
+    get_model(parent_file, all_file_info, hash64_table, temp_direc=parent_file, lod=True, b_textures=True, b_apply_textures=False, b_shaders=False, passing_dyn3=False, b_skeleton=False, obfuscate=True)
     quit()
 
     select = '0159'
