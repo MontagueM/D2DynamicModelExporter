@@ -21,6 +21,8 @@ def get_shader_from_mat(material, textures, cbuffer_offsets, all_file_info, cust
     # if material.name + '_o0.usf' in os.listdir(custom_dir):
     #     return
     shader = met.File(uid=material.fb[0x298:0x298 + 4].hex())
+    if shader.uid == 'ffffffff':
+        return
     shader.get_file_from_uid()
     shader_ref = gf.get_file_from_hash(all_file_info[shader.name]['Reference'])
     get_decompiled_hlsl(shader_ref, custom_dir)
@@ -54,7 +56,7 @@ def convert_hlsl(material, textures, cbuffer_offsets, shader_ref, custom_dir, al
     # Getting info from hlsl file
     with open(f'{custom_dir}/{shader_ref}.hlsl', 'r') as h:
         text = h.readlines()
-        instructions = get_instructions(text)
+        instructions = get_instructions(text, textures)
         cbuffer_text = get_cbuffer_text(cbuffers, text)
         inputs, outputs = get_in_out(text, instructions)
         input_append1, input_append2 = get_inputs_append(inputs)
@@ -180,7 +182,7 @@ def get_texs(text):
     return texs
 
 
-def get_instructions(text):
+def get_instructions(text, textures):
     instructions = []
     care = False
     read = False
@@ -193,9 +195,16 @@ def get_instructions(text):
                 uv = line.split(', ')[1].split(')')[0]
                 dot_after = line.split(').')[1]
                 line = f'{equal}= Material_Texture2D_{to_sample[1:]}.SampleLevel(Material_Texture2D_{samplestate-1}Sampler, {uv}, 0).{dot_after}'
+                if int(to_sample[1:]) >= len(textures):  # Are we missing textures?
+                    input(f'Missing textures ({int(to_sample[1:])} vs {len(textures)}) for shader. Enter to continue...')
             elif 'LevelOfDetail' in line:
                 equal = line.split('=')[0]
                 line = f'{equal}= 0;'
+            elif 'o0.w = ' in line:  # Disabling iridescence
+                equal = line.split('=')[0]
+                s = line.split('o0.w = ')[1]
+                if s != '-1;\n':
+                    line = f'{equal}= -1;\n'
             instructions.append('  ' + line)
             if 'return;' in line:
                 ret = ''.join(instructions)
