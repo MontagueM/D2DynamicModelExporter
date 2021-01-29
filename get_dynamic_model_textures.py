@@ -1145,81 +1145,15 @@ def parse_skin_buffer(verts_file, all_file_info, skin_file):
 
     ref_file = gf.get_file_from_hash(all_file_info[skin_file.name]['Reference'])
     skin_fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(ref_file)}/{ref_file}.bin', 'rb').read()
-    skin_data = {}
-    k = 0
-    if skin_fb and any([x & 0xf800 != 0 for x in verts_w]):  # Checking if the whole file is just a header or not
-        is_header = False
-        past_header = False
-        chunk_weight = 0
-        weight_offset = 0
-        for i in range(0, len(skin_fb), 4):
-            skin_vertex = gf.get_uint32(skin_fb, i)
-
-            index0 = skin_vertex & 0xff
-            index1 = (skin_vertex >> 8) & 0xff
-            weight0 = (skin_vertex >> 16) & 0xff
-            weight1 = (skin_vertex >> 24) & 0xff
-
-            if chunk_weight == 0:
-                weight_offset = i
-
-            chunk_index = int(weight_offset / 4)
-            stride_index = int(i / 4)
-
-            if stride_index not in skin_data.keys():
-                skin_data[stride_index] = {
-                    'index': k,
-                    'stride_index': stride_index,
-                    'count': 0,
-                    'indices': [],
-                    'weights': [],
-                }
-            chunk_data = skin_data[chunk_index]
-
-            if is_header and i % 32 != 0 and not past_header:
-                continue
-            if (index0 == weight0 or index1 == weight1) and not past_header:
-                is_header = True
-                continue
-            else:
-                past_header = True
-            # if is_header:
-            #     skin_header = [index0, index1, weight0, weight1]  # We want to skip ahead 8 here as its useless
-            #     # k += 1
-            #     # continue
-            if skin_vertex == 0:
-                pass
-            else:
-                for w in [weight0, weight1]:
-                    if w > 0:
-                        chunk_data['count'] += 1
-                    chunk_weight += w
-
-                if not chunk_data['indices']:
-                    chunk_data['indices'] = [index0, index1]
-                    chunk_data['weights'] = [weight0/255, weight1/255]
-                else:
-                    chunk_data['indices'].extend([index0, index1])
-                    chunk_data['weights'].extend([weight0/255, weight1/255])
-                if chunk_weight == 255:
-                    chunk_weight = 0
-                    k += 1
-                elif chunk_weight > 255:  # We're in the header. We re-enable the header check.
-                    raise Exception('Weights > 255')
-
-    # with open('skeltdyn.txt', 'w') as f:
-    #     for x, y in skin_data.items():
-    #         f.write(f'{y}\n')
 
     last_blend_value = 0
     last_blend_count = 0
-    for i, w in enumerate(verts_w):
+    for w in verts_w:
         indices = [0, 0, 0, 0]
         weights = [1, 0, 0, 0]
 
         blend_index = w & 0x7ff
         blend_flags = w & 0xf800
-
         buffer_size = 0
 
         if blend_flags & 0x8000:
@@ -1234,33 +1168,26 @@ def parse_skin_buffer(verts_file, all_file_info, skin_file):
             indices[0] = blend_index
         else:
             raise Exception('Unk flag used in skin buffer')
-            # raise Exception('Incorrect skin data')
 
-        blend_count = 0
         if buffer_size > 0:
             if last_blend_value != blend_index:
                 last_blend_count = 0
+
             last_blend_value = blend_index
 
-            blend_data = skin_data[blend_index * 8 + last_blend_count]
-            while blend_data['count'] == 0:
-                last_blend_count += 1
-                blend_data = skin_data[blend_index * 8 + last_blend_count]
+            for i in range(0, buffer_size, 2):
+                while skin_fb[blend_index*32 + last_blend_count:blend_index*32 + last_blend_count+4] == b'\x00\x00\x00\x00':
+                    last_blend_count += 4
+                print(i, buffer_size, blend_index, last_blend_count, blend_index*32 + i + last_blend_count)
+                indices[i] = skin_fb[blend_index*32 + last_blend_count + i*2]
+                indices[i+1] = skin_fb[blend_index*32 + 1 + last_blend_count + i*2]
+                weights[i] = skin_fb[blend_index*32 + 2 + last_blend_count + i*2]/255
+                weights[i+1] = skin_fb[blend_index*32 + 3 + last_blend_count + i*2]/255
+            last_blend_count += buffer_size*2
 
-            total_bones = blend_data['count']
-            for i in range(blend_data['count']):
-                indices[i] = blend_data['indices'][i]
-                weights[i] = blend_data['weights'][i]
-
-            if total_bones > 2:
-                blend_count = 2
-            else:
-                blend_count = 1
-
-        last_blend_count += blend_count
-
-        out_weights.append([[x for x in indices if x != 0], [x for x in weights if x != 0]])
-
+        weights = [x for x in weights if x != 0]
+        indices = indices[:len(weights)]
+        out_weights.append([indices, weights])
     return out_weights
 
 
@@ -1408,16 +1335,16 @@ if __name__ == '__main__':
     # parent_file = '01B6-02A5'  # incendior shield with the broken back and '01B6-02A8' and 02b7 02ba 02dd
     # parent_file = '0158-052A'  # eris broken, new is 0158-052A dyn1, old is prob 0938-00B9
 
-    parent_file = '01EA-1508'
-    get_model(parent_file, all_file_info, hash64_table, temp_direc=parent_file, lod=True, b_textures=True, b_apply_textures=True, b_shaders=False, passing_dyn3=False, b_skeleton=False, obfuscate=False)
-    quit()
+    parent_file = '01B8-08C6'
+    # get_model(parent_file, all_file_info, hash64_table, temp_direc=parent_file, lod=True, b_textures=True, b_apply_textures=True, b_shaders=False, passing_dyn3=False, b_skeleton=True, obfuscate=False)
+    # quit()
 
-    select = '0159'
+    select = '0156'
     folder = select
     for pkg in pkg_db.get_all_tables():
         if select in pkg:
             gf.mkdir(f'I:/dynamic_models/{pkg}')
             # if pkg not in os.listdir('C:/d2_model_temp/texture_models/tower'):
-            export_all_models(pkg, all_file_info, folder, lod_filter=True, b_textures=True, b_skeleton=True)
+            export_all_models(pkg, all_file_info, folder, lod_filter=True, b_textures=True, b_skeleton=False)
 
     print(bad_files)
