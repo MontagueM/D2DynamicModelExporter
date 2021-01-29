@@ -263,7 +263,7 @@ def get_image_from_file(file_path, all_file_info, save_path=None):
     img = get_image_from_data(header, dimensions, data_hex)
     if img:
         if save_path:
-            img.save(f'{save_path}/{file_name}.png')
+            img.save(f'{save_path}/{file_name}.tga')
         # else:
         #     img.save(f'C:/d2_output_2_9_2_0_images/{file_pkg}/{file_name}.png')
         #     img.show()
@@ -338,3 +338,11 @@ def get_image_from_data(header, dimensions, data_hex):
         print(f'Image not supported type {header.TextureFormatDefined}')
     return img
 
+
+if __name__ == '__main__':
+    pkg_db.start_db_connection(f'I:/d2_pkg_db/3_0_2_0.db')
+    all_file_info = {x[0]: dict(zip(['Reference', 'FileType'], x[1:])) for x in
+                     pkg_db.get_entries_from_table('Everything', 'FileName, Reference, FileType')}
+
+    img = '0157-1B15'
+    get_image_from_file(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(img)}/{img}.bin', all_file_info, 'imagetests/')

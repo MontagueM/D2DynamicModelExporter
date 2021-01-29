@@ -31,20 +31,20 @@ def get_armour_from_api(api_hash, strinfo, mass=False, byte=False):
             print('No dyn1')
             return
         print(f'dyn1 {dyn1}')
-        lod_filter = True
+        lod_filter = False
         apiname, ret = get_name_from_api(apihsh, strinfo)
         if i == 0:
             apiname += '_male'
         else:
             apiname += '_female'
-        if not ret:
+        if ret:
             return
         if mass:
-            temp_direc = f'apinamed/api_{apiname}'
+            temp_direc = f'apimass/api_{apiname}'
         else:
             temp_direc = f'api_{apiname}'
         dme.get_model(dyn1, all_file_info, hash64_table, lod=lod_filter, temp_direc=temp_direc, passing_dyn3=False, obfuscate=False, b_apply_textures=True,
-                  b_shaders=False, b_textures=True, jud_shader=False, from_api=True, b_skeleton=True)
+                  b_shaders=False, b_textures=True, jud_shader=False, from_api=True, b_skeleton=False)
 
 
 def get_weapon_from_api(api_hash, strinfo, mass=False, byte=False):
@@ -79,14 +79,14 @@ def get_weapon_from_api(api_hash, strinfo, mass=False, byte=False):
             print(f'dyn1 {dyn1}')
             lod_filter = True
             apiname, ret = get_name_from_api(apihsh, strinfo)
-            if not ret:
+            if ret:
                 return
             if mass:
-                temp_direc = f'apinamed/api_{apiname}'
+                temp_direc = f'apimass/api_{apiname}'
             else:
                 temp_direc = f'api_{apiname}'
             dme.get_model(dyn1, all_file_info, hash64_table, lod=lod_filter, temp_direc=temp_direc, passing_dyn3=False, obfuscate=True, b_apply_textures=True,
-                      b_shaders=False, b_textures=True, from_api=True, jud_shader=True, b_skeleton=True)
+                      b_shaders=False, b_textures=True, from_api=True, jud_shader=True, b_skeleton=False)
 
 
 def get_name_from_api(api_hash, strinfo):
@@ -109,8 +109,8 @@ def get_name_from_api(api_hash, strinfo):
 def mass_export(strinfo):
     table = '0279-114A'
     fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(table)}/{table}.bin', 'rb').read()
-    # for i in range(0x40, 4301*0x20, 0x20):
-    for i in range(4301 * 0x20, 0x40, -0x20):
+    for i in range(0x40, 4301*0x20, 0x20):
+    # for i in range(4301 * 0x20, 0x40, -0x20):
         bhsh = fb[i:i+4]
         print(f'\nGetting {bhsh.hex()}...\n')
         if fb[i+0x18:i+0x18+4] != b'\x00\x00\x00\x00':
@@ -133,7 +133,7 @@ if __name__ == '__main__':
 
     # Moonfang cloak 2701727616 (cloaks dont get exported)
     # Moonfang crown 2288398391
-    api_hash = 2702372534
+    api_hash = 197761153
     # get_armour_from_api(api_hash, strinfo)
 
     # Trials auto 1909527966
@@ -142,9 +142,9 @@ if __name__ == '__main__':
     # Cold denial 1216130969
 
     api_hash = 1650442173
-    get_weapon_from_api(api_hash, strinfo)
+    # get_weapon_from_api(api_hash, strinfo)
 
     api_hash = 1839565992
-    get_weapon_from_api(api_hash, strinfo)
+    # get_weapon_from_api(api_hash, strinfo)
 
-    # mass_export(strinfo)
+    mass_export(strinfo)

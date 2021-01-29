@@ -790,7 +790,7 @@ def adjust_faces_data(faces_data, max_vert_used):
 
 
 def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True, b_textures=False, b_temp_direc_full=False, obfuscate=False, b_apply_textures=False, passing_dyn3=False, b_skeleton=False, from_api=False, b_shaders=False, jud_shader=False, custom_export=False):
-    b_verbose = False
+    b_verbose = True
     if custom_export:
         model = custom_export
     else:
@@ -899,7 +899,8 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
                     print('Model file empty')
                 continue
             fbdyn3 = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(model_file)}/{model_file}.bin', 'rb').read()
-            # print(f'Parent file {model_file}')
+            if b_verbose:
+                print(f'Dyn3 {model_file}')
             pos_verts_files, uv_verts_files, faces_files, skin_buffer_files, og_weight_files = get_verts_faces_files(model_file)
 
             if skel_file:
@@ -939,6 +940,9 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
                     #     break
                     if any([x.lod_level == 0 for x in submeshes]):
                         if submesh.lod_level == 0:
+                            submeshes_to_write.append(submesh)
+                    elif any([x.lod_level == 1 for x in submeshes]):
+                        if submesh.lod_level == 1:
                             submeshes_to_write.append(submesh)
                     else:
                         submeshes_to_write.append(submesh)
@@ -1117,9 +1121,9 @@ def try_get_material_textures(submesh, temp_direc, b_apply_textures, hash64_tabl
     # image_indices = [gf.get_file_from_hash(submesh.material.fhex[offset+16+8*(2*i):offset+16+8*(2*i)+8]) for i in range(count)]
     with open(f'I:/dynamic_models/{temp_direc}/textures/tex.txt', 'a') as f:
         f.write(f'Submesh {submesh.name} textures: {submesh.textures}\n')
-    if not submesh.diffuse:  # Not sure on this, causes a lot of things to break
-        if b_apply_textures:
-            submesh.diffuse = submesh.textures[0]
+    # if not submesh.diffuse:  # Not sure on this, causes a lot of things to break
+    if b_apply_textures:
+        submesh.diffuse = submesh.textures[0]
     for img in submesh.textures:
         if img == 'FBFF-1FFF':
             continue
@@ -1404,7 +1408,7 @@ if __name__ == '__main__':
     # parent_file = '01B6-02A5'  # incendior shield with the broken back and '01B6-02A8' and 02b7 02ba 02dd
     # parent_file = '0158-052A'  # eris broken, new is 0158-052A dyn1, old is prob 0938-00B9
 
-    parent_file = '01BF-02B4'
+    parent_file = '01EA-1508'
     get_model(parent_file, all_file_info, hash64_table, temp_direc=parent_file, lod=True, b_textures=True, b_apply_textures=True, b_shaders=False, passing_dyn3=False, b_skeleton=False, obfuscate=False)
     quit()
 

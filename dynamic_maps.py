@@ -5,7 +5,7 @@ import pyfbx_jo as pfb
 import get_dynamic_model_textures as gdmt
 import scipy.spatial
 import fbx
-import random
+import re
 
 
 class DynamicModel:
@@ -129,6 +129,55 @@ def create_mesh(model, submesh, name, skel_file):
     return mesh
 
 
+def get_8E8E8080_table(table_file):
+    dic = {}
+    mainfb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(table_file)}/{table_file}.bin', 'rb').read()
+    find = [m.start() for m in re.finditer(b'\x48\x89\x80\x80', mainfb)]
+    for o in find:
+        count = gf.get_uint32(mainfb, o-8)
+        # print('o', o-8, count, mainfb[o-8:o-4])
+        o += 8
+        for i in range(o, o+count*0x20, 0x20):
+            # Getting string
+            stroffset = gf.get_uint32(mainfb, i)
+            string = ''
+            k = 0
+            while True:
+                char = mainfb[i + stroffset + k]
+                if char == 0:
+                    break
+                else:
+                    string += chr(char)
+                    k += 1
+            dic[string] = []
+            # Getting dynamic map
+            f1 = gf.get_file_from_hash(mainfb[i+0x1C:i+0x1C+4].hex())
+            print(string, f1)
+            fb1 = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(f1)}/{f1}.bin', 'rb').read()
+            # Two files here, picking first for testing
+            for f2 in [gf.get_file_from_hash(fb1[0x18:0x18+4].hex()), gf.get_file_from_hash(fb1[0x1C:0x1C+4].hex())]:
+                fb2 = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(f2)}/{f2}.bin', 'rb').read()
+                # Lots of files, picking first for testing
+                count = gf.get_uint32(fb2, 0x30)
+                for j in range(0x40, 0x40+count*4, 4):
+                    f3 = gf.get_file_from_hash(fb2[j:j+4].hex())
+                    # print(f3)
+                    fb3 = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(f3)}/{f3}.bin', 'rb').read()
+
+                    f4 = gf.get_file_from_hash(fb3[0x20:0x20+4].hex())
+                    fb4 = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(f4)}/{f4}.bin', 'rb').read()
+                    off1 = gf.get_uint32(fb4, 0x18) + 156
+                    off2 = gf.get_uint32(fb4, 0x18) + 112
+
+                    for off in [off1, off2]:
+                        f5 = gf.get_file_from_hash(fb4[off:off+4].hex())
+                        if f5 in all_file_info.keys() and all_file_info[f5]['FileType'] == 'Dynamic Mapping Data' and f5 not in [x[0] for x in dic[string]]:
+                            dic[string].append([f5, len(open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(f5)}/{f5}.bin', 'rb').read())])
+
+    [list(x).sort(key=lambda u: u[1]) for x in dic.values()]
+    print([print(x, y) for x,y in dic.items()])
+
+
 if __name__ == '__main__':
     version = '3_0_2_0'
 
@@ -140,4 +189,5 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['Reference', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, Reference, FileType')}
 
-    get_map('02AC-1A33')
+    get_map('02AB-017F')
+    # get_8E8E8080_table('02AC-1E10')
