@@ -144,11 +144,13 @@ def get_inputs_append(inputs):
     for inp in inputs:
         inps = inp.split(' ')
         if 'TEXCOORD' in inp:
+            input_append2 += f'    {inps[3]}.xy = {inps[3]}.xy * tx;\n'
             if 'float4' in inp:
                 write = f'\nstatic {inps[2]} {inps[3]} = ' + '{1, 1, 1, 1};\n'
+                input_append2 += f'    {inps[3]}.zw = {inps[3]}.zw * tx;\n'
             elif 'float3' in inp:
                 write = f'\nstatic {inps[2]} {inps[3]} = ' + '{1, 1, 1};\n'
-            input_append2 += f'    {inps[3]}.xy = {inps[3]}.xy * tx;\n'
+                input_append2 += f'    {inps[3]}.z = {inps[3]}.z * tx[0];\n'
         elif 'SV_isFrontFace0' in inp:
             write = f'\nstatic {inps[2]} {inps[3]} = 1;\n'
         elif 'SV_POSITION0' in inp:

@@ -26,6 +26,8 @@ def read_table(table_file):
         dyn.rotation = [struct.unpack('f', fb[i+4*j:i+4*(j+1)])[0] for j in range(4)]
         dyn.location = [struct.unpack('f', fb[0x10+i+4*j:0x10+i+4*(j+1)])[0] for j in range(3)]
         dyn.scale = struct.unpack('f', fb[0x1C+i:0x1C+i+4])[0]
+        if fb[i+0x30:i+0x38].hex().upper() == 'C59D1C81C59D1C81':
+            continue
         dyn.dyn1 = gf.get_file_from_hash(hash64_table[fb[i+0x30:i+0x38].hex().upper()])
         dyns.append(dyn)
     return dyns
@@ -189,5 +191,5 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['Reference', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, Reference, FileType')}
 
-    get_map('02AB-017F')
-    # get_8E8E8080_table('02AC-1E10')
+    get_map('02A9-1E75')
+    # get_8E8E8080_table('02C6-1E63')

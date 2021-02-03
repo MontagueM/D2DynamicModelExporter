@@ -45,12 +45,12 @@ class TexturePlateSet:
         return {'diffuse': a, 'normal': b, 'gstack': c, 'dyemap': d}
 
     def export_texture_plate_set(self, save_dir, altname=None):
-        # We'll append _diffuse.png, _normal.png, _gstack.png to the save_dir per set
+        # We'll append _diffuse.tga, _normal.tga, _gstack.tga to the save_dir per set
         for type, plate in self.plates.items():
             if altname:
-                plate.export_plate(f'{save_dir}/{altname}_{type}.png')
+                plate.export_plate(f'{save_dir}/{altname}_{type}.tga')
             else:
-                plate.export_plate(f'{save_dir}/{type}.png')
+                plate.export_plate(f'{save_dir}/{type}.tga')
 
 
 class TexturePlate:
