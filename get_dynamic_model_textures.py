@@ -372,10 +372,16 @@ class SubmeshEntryProper:
         self.FFFFFFFF = None
 
 
-def trim_verts_data(verts_data, dsort):
+def trim_verts_data(verts_data, dsort, vc=False):
     v_new = []
     for i in dsort:
-        v_new.append(verts_data[i])
+        if vc:
+            if i >= len(verts_data):
+                v_new.append([0, 0, 0, 0])
+            else:
+                v_new.append(verts_data[i])
+        else:
+            v_new.append(verts_data[i])
 
     return v_new
 
@@ -481,7 +487,8 @@ def get_submeshes(file, index, pos_verts, uv_verts, weights, vert_colours, face_
             submesh.weights = []
 
         if vert_colours:
-            submesh.vert_colours = trim_verts_data(vert_colours, dsort)
+            submesh.vert_colours = trim_verts_data(vert_colours[:-1], dsort, vc=True)
+            # submesh.vert_colours = vert_colours[:-1]
             # print('Vert colours true')
         elif jud_shader:
             vc = [0, 0, 0, 1]
@@ -723,6 +730,7 @@ def get_verts_faces_files(model_file):
     faces_files = []
     original_weight_files = []
     skin_buffer_files = []
+    vert_colour_files = []
     pkg_name = gf.get_pkg_name(model_file)
     try:
         model_data_hex = gf.get_hex_data(f'{test_dir}/{pkg_name}/{model_file}.bin')
@@ -753,11 +761,13 @@ def get_verts_faces_files(model_file):
                 original_weight_files.append(hf)
             elif j == 32:
                 faces_files.append(hf)
+            elif j == 40:
+                vert_colour_files.append(hf)
             elif j == 48:
                 skin_buffer_files.append(hf)
                 break
     # print(pos_verts_files, uv_verts_files)
-    return pos_verts_files, uv_verts_files, faces_files, skin_buffer_files, original_weight_files
+    return pos_verts_files, uv_verts_files, faces_files, skin_buffer_files, original_weight_files, vert_colour_files
 
 
 # def get_lod_0_faces(model_file, num):
@@ -822,7 +832,7 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
         # print(f'Parent file {model_file}')
         gf.mkdir(f'I:/dynamic_models/{temp_direc}/')
         gf.mkdir(f'I:/dynamic_models/{temp_direc}/textures/')
-        pos_verts_files, uv_verts_files, faces_files, skin_buffer_files, og_weight_files = get_verts_faces_files(
+        pos_verts_files, uv_verts_files, faces_files, skin_buffer_files, og_weight_files, vert_colour_files = get_verts_faces_files(
             model_file)
 
         if skel_file:
@@ -846,6 +856,8 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
                 weights = get_og_weights(all_file_info, og_weight_files[i])
             elif skin_buffer_files[i].uid != 'FFFFFFFF':
                 weights = parse_skin_buffer(pos_vert_file, all_file_info, skin_buffer_files[i])
+            elif vert_colour_files[i].uid != 'FFFFFFFF':
+                vert_colours = get_vert_colours(all_file_info, vert_colour_files[i])
             else:
                 if b_verbose:
                     print('No weights')
@@ -922,7 +934,7 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
             if b_verbose:
                 print(f'Dyn2 {dyn2}')
                 print(f'Dyn3 {model_file}')
-            pos_verts_files, uv_verts_files, faces_files, skin_buffer_files, og_weight_files = get_verts_faces_files(model_file)
+            pos_verts_files, uv_verts_files, faces_files, skin_buffer_files, og_weight_files, vert_colour_files = get_verts_faces_files(model_file)
 
             if skel_file:
                 bones = add_skeleton(model, skel_file)
@@ -948,6 +960,9 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
                 else:
                     if b_verbose:
                         print('No weights')
+
+                if vert_colour_files[i].uid != 'FFFFFFFF':
+                    vert_colours = get_vert_colours(all_file_info, vert_colour_files[i])
 
                 face_hex = get_face_hex(faces_file, all_file_info)
                 submeshes = get_submeshes(model_file, i, pos_verts, uv_verts, weights, vert_colours, face_hex, jud_shader, obfuscate)
@@ -1015,6 +1030,20 @@ def collect_extra_textures(fb, temp_direc, b_verbose):
             if not os.path.exists(f'I:/dynamic_models/{temp_direc}/unk_textures/{img}.tga'):
                 imager.get_image_from_file(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(img)}/{img}.bin', all_file_info, f'I:/dynamic_models/{temp_direc}/unk_textures/')
 
+
+def get_vert_colours(all_file_info, vert_colour_file):
+    vert_colours = []
+    ref_file = gf.get_file_from_hash(all_file_info[vert_colour_file.name]['Reference'])
+    fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(ref_file)}/{ref_file}.bin', 'rb').read()
+    for i in range(0, len(fb), 4):
+        vcs = []
+        for j in range(4):
+            vc = fb[i+j] / 255
+            vcs.append(vc)
+        if vcs[-1] != 1.0:
+            vcs = [0, 0, 0, 0]
+        vert_colours.append(vcs)
+    return vert_colours
 
 
 def get_og_weights(all_file_info, og_weight_file):
@@ -1385,9 +1414,9 @@ if __name__ == '__main__':
     # parent_file = '01B6-02A5'  # incendior shield with the broken back and '01B6-02A8' and 02b7 02ba 02dd
     # parent_file = '0158-052A'  # eris broken, new is 0158-052A dyn1, old is prob 0938-00B9
 
-    parent_file = '01B8-0B10'
-    get_model(parent_file, all_file_info, hash64_table, temp_direc=parent_file, lod=True, b_textures=False,
-              b_apply_textures=False, b_shaders=False, passing_dyn3=False, b_skeleton=False,
+    parent_file = '01B6-0C3A'
+    get_model(parent_file, all_file_info, hash64_table, temp_direc=parent_file, lod=True, b_textures=True,
+              b_apply_textures=True, b_shaders=False, passing_dyn3=False, b_skeleton=True,
               obfuscate=False, b_collect_extra_textures=False)
     quit()
 
