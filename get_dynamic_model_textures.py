@@ -501,7 +501,6 @@ def get_submeshes(file, index, pos_verts, uv_verts, weights, jud_vcs, vert_colou
         if vert_colours:
             submesh.vert_colours = trim_verts_data(vert_colours[:-1], dsort, vc=True)
             # submesh.vert_colours = vert_colours[:-1]
-            print('Vert colours true')
         if jud_shader and not any([x != [0, 0, 0, 0] for x in submesh.vert_colours]):
             vcs = []
             for w in jud_vcs:
@@ -890,12 +889,10 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
                 # if first_mat != submesh.material:
                 #     break
                 if any([x.lod_level == 0 for x in submeshes if x.entry.IndexOffset == submesh.entry.IndexOffset]):
-                    print([x.lod_level == 0 for x in submeshes if x.entry.IndexOffset == submesh.entry.IndexOffset])
                     if submesh.lod_level == 0:
                         submeshes_to_write.append(submesh)
                 else:
                     if submesh.lod_level == min([x.lod_level for x in submeshes if x.entry.IndexOffset == submesh.entry.IndexOffset]):
-                        print(f'Adding submesh lod {submesh.lod_level}')
                         submeshes_to_write.append(submesh)
             if not custom_export:
                 if lod:
@@ -1002,12 +999,10 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
                     # else:
                     #     submeshes_to_write.append(submesh)
                     if any([x.lod_level == 0 for x in submeshes if x.entry.LODGroup == submesh.entry.LODGroup]):
-                        print([x.lod_level == 0 for x in submeshes if x.entry.LODGroup == submesh.entry.LODGroup])
                         if submesh.lod_level == 0:
                             submeshes_to_write.append(submesh)
                     else:
                         if submesh.lod_level == min([x.lod_level for x in submeshes if x.entry.LODGroup == submesh.entry.LODGroup]):
-                            print(f'Adding submesh lod {submesh.lod_level}')
                             submeshes_to_write.append(submesh)
                 # if d == dyn2_secondary:  #  TODO implement
                 #     merge_submeshes()
@@ -1255,6 +1250,19 @@ def parse_skin_buffer(verts_file, all_file_info, skin_file):
 
     last_blend_value = 0
     last_blend_count = 0
+
+    # Finding header end
+    i = 0
+    while True:
+        if skin_fb[i:i+2] == skin_fb[i+2:i+4] or b'\x00\x00\x00\x00' in skin_fb[i:i+2]:
+            in_header = True
+            i = 32 * i // 32 + 32
+        else:
+            in_header = False
+            i += 4
+        if i % 32 == 0 and i != 0 and not in_header:
+            header_offset = i - 64
+            break
     for w in verts_w:
         indices = [0, 0, 0, 0]
         weights = [1, 0, 0, 0]
@@ -1285,6 +1293,8 @@ def parse_skin_buffer(verts_file, all_file_info, skin_file):
             for i in range(0, buffer_size, 2):
                 while skin_fb[blend_index*32 + last_blend_count:blend_index*32 + last_blend_count+4] == b'\x00\x00\x00\x00':
                     last_blend_count += 4
+                while blend_index*32 + last_blend_count + i*2 <= header_offset:
+                    last_blend_count += 32
                 indices[i] = skin_fb[blend_index*32 + last_blend_count + i*2]
                 indices[i+1] = skin_fb[blend_index*32 + 1 + last_blend_count + i*2]
                 weights[i] = skin_fb[blend_index*32 + 2 + last_blend_count + i*2]/255
