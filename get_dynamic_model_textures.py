@@ -133,7 +133,7 @@ def get_verts_data(verts_file, all_file_info, is_uv):
         print(f'Verts: Incorrect type of file {ref_file_type} for ref file {ref_file} verts file {verts_file}')
         return None
     # print(verts_file.name)
-
+    vcs = []
     if stride_header.StrideLength == 4:
         """
         UV info for dynamic, physics-based objects.
@@ -165,7 +165,7 @@ def get_verts_data(verts_file, all_file_info, is_uv):
         if is_uv:
             coords = get_coords_24_uv(hex_data_split)
         else:
-            coords = get_coords_24(hex_data_split)
+            coords, vcs = get_coords_24(hex_data_split)
     elif stride_header.StrideLength == 28:
         """
         """
@@ -189,7 +189,7 @@ def get_verts_data(verts_file, all_file_info, is_uv):
         print(f'Need to add support for stride length {stride_header.StrideLength}')
         quit()
 
-    return coords
+    return coords, vcs
 
 
 def get_coords_4(hex_data_split):
@@ -262,6 +262,7 @@ def get_coords_24_uv(hex_data_split):
 
 
 def get_coords_24(hex_data_split):
+    vcs = []
     coords = []
     for hex_data in hex_data_split:
         coord = []
@@ -269,7 +270,12 @@ def get_coords_24(hex_data_split):
             flt = get_float16(hex_data, j, is_uv=False)
             coord.append(flt)
         coords.append(coord)
-    return coords
+
+        # Jud shader vertex colours
+        n = gf.get_uint16(bytes.fromhex(hex_data), 14)
+        vcs.append(n)
+    return coords, vcs
+
 
 def get_coords_28(hex_data_split):
     coords = []
@@ -385,7 +391,7 @@ def trim_verts_data(verts_data, dsort, vc=False):
 
     return v_new
 
-def get_submeshes(file, index, pos_verts, uv_verts, weights, vert_colours, face_hex, jud_shader, obfuscate):
+def get_submeshes(file, index, pos_verts, uv_verts, weights, jud_vcs, vert_colours, face_hex, jud_shader, obfuscate):
     # faces_ = faces
     # Getting the submesh table entries
     fbin = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(file)}/{file}.bin', 'rb').read()
@@ -398,6 +404,8 @@ def get_submeshes(file, index, pos_verts, uv_verts, weights, vert_colours, face_
     offset += 8
     stride = 4
 
+    current_lod = 999
+    lod_group = 0
     for i in range(offset, offset+0x24*entry_count, 0x24):
         entry = SubmeshEntryProper()
         entry.Material = fbin[i:i+4]
@@ -410,6 +418,10 @@ def get_submeshes(file, index, pos_verts, uv_verts, weights, vert_colours, face_
         # if entry.Flags & 0x8 != 0:
         #     print('Model using alpha test')
         entry.LODLevel = fbin[i+0x1B]
+        if entry.LODLevel < current_lod:
+            lod_group += 1
+        current_lod = entry.LODLevel
+        entry.LODGroup = lod_group
         entries.append(entry)
 
     if len(pos_verts) > 65535:
@@ -444,7 +456,7 @@ def get_submeshes(file, index, pos_verts, uv_verts, weights, vert_colours, face_
     want_existing = True
     for submesh in list(submeshes):
         if submesh.entry.IndexOffset in existing.keys() and want_existing:
-            if submesh.lod_level > existing[submesh.entry.IndexOffset]['LOD']:
+            if submesh.lod_level >= existing[submesh.entry.IndexOffset]['LOD']:
                 submeshes.remove(submesh)
                 continue
             # elif submesh.lod_level == existing[submesh.entry.IndexOffset]['LOD']:
@@ -489,26 +501,30 @@ def get_submeshes(file, index, pos_verts, uv_verts, weights, vert_colours, face_
         if vert_colours:
             submesh.vert_colours = trim_verts_data(vert_colours[:-1], dsort, vc=True)
             # submesh.vert_colours = vert_colours[:-1]
-            # print('Vert colours true')
-        elif jud_shader:
-            vc = [0, 0, 0, 1]
-            if submesh.GearDyeChangeColourIndex == 0:
-                vc[0] = 0.333
-            elif submesh.GearDyeChangeColourIndex == 1:
-                vc[0] = 0.666
-            elif submesh.GearDyeChangeColourIndex == 2:
-                vc[0] = 0.999
-            elif submesh.GearDyeChangeColourIndex == 3:
-                vc[1] = 0.333
-            elif submesh.GearDyeChangeColourIndex == 4:
-                vc[1] = 0.666
-            elif submesh.GearDyeChangeColourIndex == 5:
-                vc[1] = 0.999
+            print('Vert colours true')
+        if jud_shader and not any([x != [0, 0, 0, 0] for x in submesh.vert_colours]):
+            vcs = []
+            for w in jud_vcs:
+                bitw = w & 0x7
+                vc = [0, 0, 0, 1]
+                # if not w & 0x8000:
+                #     vcs.append(vc)
+                #     continue
+                if bitw == 0:
+                    vc[0] = 0.333
+                elif bitw == 1:
+                    vc[0] = 0.666
+                elif bitw == 2:
+                    vc[0] = 0.999
+                elif bitw == 3:
+                    vc[1] = 0.333
+                elif bitw == 4:
+                    vc[1] = 0.666
+                elif bitw == 5:
+                    vc[1] = 0.999
+                vcs.append(vc)
+            submesh.vert_colours = trim_verts_data(vcs, dsort)
 
-            if submesh.AlphaClip != 0:
-                vc[2] = 0.25
-            submesh.vert_colours = [vc for x in range(len(submesh.pos_verts))]
-            a = 0
         alt = shift_faces_down(smfaces)
         submesh.faces = alt
         # submesh.faces = smfaces
@@ -605,7 +621,7 @@ def export_fbx(b_temp_direc_full, model, temp_direc, model_file, obfuscate):
 
 
 def add_vert_colours(mesh, name, submesh: Submesh, layer):
-    vertColourElement = fbx.FbxLayerElementVertexColor.Create(mesh, f'colour')
+    vertColourElement = fbx.FbxLayerElementVertexColor.Create(mesh, 'slots')
     vertColourElement.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
     vertColourElement.SetReferenceMode(fbx.FbxLayerElement.eDirect)
     # mesh.InitTextureUV()
@@ -873,11 +889,14 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
                     first_mat = submesh.material
                 # if first_mat != submesh.material:
                 #     break
-                if any([x.lod_level == 0 for x in submeshes]):
+                if any([x.lod_level == 0 for x in submeshes if x.entry.IndexOffset == submesh.entry.IndexOffset]):
+                    print([x.lod_level == 0 for x in submeshes if x.entry.IndexOffset == submesh.entry.IndexOffset])
                     if submesh.lod_level == 0:
                         submeshes_to_write.append(submesh)
                 else:
-                    submeshes_to_write.append(submesh)
+                    if submesh.lod_level == min([x.lod_level for x in submeshes if x.entry.IndexOffset == submesh.entry.IndexOffset]):
+                        print(f'Adding submesh lod {submesh.lod_level}')
+                        submeshes_to_write.append(submesh)
             if not custom_export:
                 if lod:
                     add_to_fbx(model, bones, submeshes_to_write, parent_file, pos_vert_file.uid.upper(), temp_direc,
@@ -897,8 +916,8 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
         skel = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(skel_file)}/{skel_file}.bin', 'rb').read()
         if b'\x42\x86\x80\x80' not in skel:  # Using default player skeleton
             dyn2_primary = skel_file
-            # skel_file = '0186-138F'  # Body
-            skel_file = '0159-1A9E'  # Full head
+            skel_file = '0186-138F'  # Body
+            # skel_file = '0159-1A9E'  # Full head
         if not b_skeleton:
             skel_file = ''
 
@@ -946,11 +965,11 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
                 vert_colours = []
                 uv_verts = []
                 faces_file = faces_files[i]
-                pos_verts = get_verts_data(pos_vert_file, all_file_info, is_uv=False)
+                pos_verts, jud_vcs = get_verts_data(pos_vert_file, all_file_info, is_uv=False)
 
                 pos_verts = scale_and_repos_pos_verts(pos_verts, fbdyn3, d)
                 if uv_verts_files[i].uid != 'FFFFFFFF':
-                    uv_verts = get_verts_data(uv_verts_files[i], all_file_info, is_uv=True)
+                    uv_verts, _ = get_verts_data(uv_verts_files[i], all_file_info, is_uv=True)
                     uv_verts = scale_and_repos_uv_verts(uv_verts, fbdyn3)
 
                 if og_weight_files[i].uid != 'FFFFFFFF':
@@ -965,7 +984,7 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
                     vert_colours = get_vert_colours(all_file_info, vert_colour_files[i])
 
                 face_hex = get_face_hex(faces_file, all_file_info)
-                submeshes = get_submeshes(model_file, i, pos_verts, uv_verts, weights, vert_colours, face_hex, jud_shader, obfuscate)
+                submeshes = get_submeshes(model_file, i, pos_verts, uv_verts, weights, jud_vcs, vert_colours, face_hex, jud_shader, obfuscate)
                 first_mat = None
                 submeshes_to_write = []
                 for submesh in submeshes:
@@ -974,14 +993,22 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
                         first_mat = submesh.material
                     # if first_mat != submesh.material:
                     #     break
-                    if any([x.lod_level == 0 for x in submeshes]):
+                    # if any([x.lod_level == 0 for x in submeshes]):
+                    #     if submesh.lod_level == 0:
+                    #         submeshes_to_write.append(submesh)
+                    # elif any([x.lod_level == 1 for x in submeshes]):
+                    #     if submesh.lod_level == 1:
+                    #         submeshes_to_write.append(submesh)
+                    # else:
+                    #     submeshes_to_write.append(submesh)
+                    if any([x.lod_level == 0 for x in submeshes if x.entry.LODGroup == submesh.entry.LODGroup]):
+                        print([x.lod_level == 0 for x in submeshes if x.entry.LODGroup == submesh.entry.LODGroup])
                         if submesh.lod_level == 0:
                             submeshes_to_write.append(submesh)
-                    elif any([x.lod_level == 1 for x in submeshes]):
-                        if submesh.lod_level == 1:
-                            submeshes_to_write.append(submesh)
                     else:
-                        submeshes_to_write.append(submesh)
+                        if submesh.lod_level == min([x.lod_level for x in submeshes if x.entry.LODGroup == submesh.entry.LODGroup]):
+                            print(f'Adding submesh lod {submesh.lod_level}')
+                            submeshes_to_write.append(submesh)
                 # if d == dyn2_secondary:  #  TODO implement
                 #     merge_submeshes()
                 if not custom_export:
@@ -1414,9 +1441,9 @@ if __name__ == '__main__':
     # parent_file = '01B6-02A5'  # incendior shield with the broken back and '01B6-02A8' and 02b7 02ba 02dd
     # parent_file = '0158-052A'  # eris broken, new is 0158-052A dyn1, old is prob 0938-00B9
 
-    parent_file = '01B6-0C3A'
+    parent_file = '011C-1130'
     get_model(parent_file, all_file_info, hash64_table, temp_direc=parent_file, lod=True, b_textures=True,
-              b_apply_textures=True, b_shaders=False, passing_dyn3=False, b_skeleton=True,
+              b_apply_textures=True, b_shaders=False, passing_dyn3=False, b_skeleton=False,
               obfuscate=False, b_collect_extra_textures=False)
     quit()
 

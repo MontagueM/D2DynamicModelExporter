@@ -31,7 +31,7 @@ def get_armour_from_api(api_hash, strinfo, mass=False, byte=False):
             print('No dyn1')
             return
         print(f'dyn1 {dyn1}')
-        lod_filter = False
+        lod_filter = True
         apiname, ret = get_name_from_api(apihsh, strinfo)
         if i == 0:
             apiname += '_male'
@@ -44,7 +44,7 @@ def get_armour_from_api(api_hash, strinfo, mass=False, byte=False):
         else:
             temp_direc = f'api_{apiname}'
         dme.get_model(dyn1, all_file_info, hash64_table, lod=lod_filter, temp_direc=temp_direc, passing_dyn3=False, obfuscate=False, b_apply_textures=False,
-                  b_shaders=True, b_textures=True, jud_shader=False, from_api=True, b_skeleton=False)
+                  b_shaders=False, b_textures=True, jud_shader=True, from_api=True, b_skeleton=True)
 
 
 def get_weapon_from_api(api_hash, strinfo, mass=False, byte=False):
@@ -83,7 +83,7 @@ def get_weapon_from_api(api_hash, strinfo, mass=False, byte=False):
                 print('dyn1 not available')
                 continue
             print(f'dyn1 {dyn1}')
-            lod_filter = False
+            lod_filter = True
             apiname, ret = get_name_from_api(apihsh, strinfo)
             # if not ret:
             #     return
@@ -139,15 +139,15 @@ if __name__ == '__main__':
 
     # Moonfang cloak 2701727616 (cloaks dont get exported)
     # Moonfang crown 2288398391
-    api_hash = 1658294130
-    # get_armour_from_api(api_hash, strinfo)
+    api_hash = 197761153
+    get_armour_from_api(api_hash, strinfo)
 
     # Trials auto 1909527966
     # Ace of spades 347366834
     # Eystein-D (lots of sights) 1291586825
     # Cold denial 1216130969
 
-    api_hash = 1645521766
+    api_hash = 1030895163
     get_weapon_from_api(api_hash, strinfo)
 
     api_hash = 1839565992
