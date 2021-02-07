@@ -107,7 +107,7 @@ def convert_hlsl(material, textures, cbuffer_offsets, shader_ref, custom_dir, al
             }
             float3 zero = {0, 0, 0};
             MA.Normal = zero;
-            MA.Specular = zero;
+            MA.Specular = 0;
             return MA;
                 """.replace('            ', '    ')
                 line = line.replace('return;', new_line)

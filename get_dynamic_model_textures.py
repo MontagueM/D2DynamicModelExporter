@@ -944,8 +944,8 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
         skel = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(skel_file)}/{skel_file}.bin', 'rb').read()
         if b'\x42\x86\x80\x80' not in skel:  # Using default player skeleton
             dyn2_primary = skel_file
-            skel_file = '0186-138F'  # Body
-            # skel_file = '0159-1A9E'  # Full head
+            # skel_file = '0186-138F'  # Body
+            skel_file = '0159-1A9E'  # Full head
         if not b_skeleton:
             skel_file = ''
 
@@ -1280,25 +1280,26 @@ def parse_skin_buffer(verts_file, all_file_info, skin_file):
 
     ref_file = gf.get_file_from_hash(all_file_info[skin_file.name]['Reference'])
     skin_fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(ref_file)}/{ref_file}.bin', 'rb').read()
-    if len(skin_fb) < 32:
-        return
-    last_blend_value = 0
-    last_blend_count = 0
-
-    # Finding header end
-    i = 0
-    while True:
-        if skin_fb[i:i+2] == skin_fb[i+2:i+4] or b'\x00\x00\x00\x00' in skin_fb[i:i+2]:
-            in_header = True
-            i = 32 * i // 32 + 32
-        else:
-            in_header = False
-            i += 4
-        if i % 32 == 0 and i != 0 and not in_header:
-            header_offset = i - 64
-            break
-        if i >= len(skin_fb):
+    if any([w & 0xf800 != 0 for w in verts_w]):
+        if len(skin_fb) < 32:
             return
+        last_blend_value = 0
+        last_blend_count = 0
+
+        # Finding header end
+        i = 0
+        while True:
+            if skin_fb[i:i+2] == skin_fb[i+2:i+4] or b'\x00\x00\x00\x00' in skin_fb[i:i+2]:
+                in_header = True
+                i = 32 * i // 32 + 32
+            else:
+                in_header = False
+                i += 4
+            if i % 32 == 0 and i != 0 and not in_header:
+                header_offset = i - 64
+                break
+            if i >= len(skin_fb):
+                return
     for w in verts_w:
         indices = [0, 0, 0, 0]
         weights = [1, 0, 0, 0]
@@ -1487,18 +1488,18 @@ if __name__ == '__main__':
     # parent_file = '01B6-02A5'  # incendior shield with the broken back and '01B6-02A8' and 02b7 02ba 02dd
     # parent_file = '0158-052A'  # eris broken, new is 0158-052A dyn1, old is prob 0938-00B9
 
-    parent_file = '01BC-08B5'
-    get_model(parent_file, all_file_info, hash64_table, temp_direc=parent_file, lod=True, b_textures=True,
-              b_apply_textures=True, b_shaders=False, passing_dyn3=False, b_skeleton=True,
-              obfuscate=True, b_collect_extra_textures=True)
-    quit()
+    parent_file = '0156-1668'
+    # get_model(parent_file, all_file_info, hash64_table, temp_direc=parent_file, lod=True, b_textures=True,
+    #           b_apply_textures=True, b_shaders=False, passing_dyn3=False, b_skeleton=True,
+    #           obfuscate=True, b_collect_extra_textures=True)
+    # quit()
 
-    select = 'cinematic'
+    select = '0156'
     folder = select
     for pkg in pkg_db.get_all_tables():
         if select in pkg:
             gf.mkdir(f'I:/dynamic_models/{pkg}')
             # if pkg not in os.listdir('C:/d2_model_temp/texture_models/tower'):
-            export_all_models(pkg, all_file_info, folder, lod_filter=True, b_textures=False, b_skeleton=False, obfuscate=False)
+            export_all_models(pkg, all_file_info, folder, lod_filter=True, b_textures=False, b_skeleton=True, obfuscate=True)
 
     print(bad_files)
