@@ -184,7 +184,7 @@ def get_verts_data(verts_file, all_file_info, is_uv):
         Coord info for dynamic, physics-based objects.
         """
         # print('Stride 48')
-        coords = get_coords_48(hex_data_split)
+        coords, vcs = get_coords_48(hex_data_split)
     else:
         print(f'Need to add support for stride length {stride_header.StrideLength}')
         quit()
@@ -312,13 +312,18 @@ def get_coords_40(hex_data_split):
 
 def get_coords_48(hex_data_split):
     coords = []
+    vcs = []
     for hex_data in hex_data_split:
         coord = []
         for j in range(3):
             flt = struct.unpack('f', bytes.fromhex(hex_data[j * 8:j * 8 + 8]))[0]
             coord.append(flt)
         coords.append(coord)
-    return coords
+
+        # Jud shader vertex colours
+        n = gf.get_uint32(bytes.fromhex(hex_data), 0x1C)
+        vcs.append(n)
+    return coords, vcs
 
 
 class Submesh:
@@ -391,7 +396,7 @@ def trim_verts_data(verts_data, dsort, vc=False):
 
     return v_new
 
-def get_submeshes(file, index, pos_verts, uv_verts, weights, jud_vcs, vert_colours, face_hex, jud_shader, obfuscate):
+def get_submeshes(file, index, pos_verts, uv_verts, weights, jud_vcs, vert_colours, face_hex, jud_shader, obfuscate, cloth_override):
     # faces_ = faces
     # Getting the submesh table entries
     fbin = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(file)}/{file}.bin', 'rb').read()
@@ -498,31 +503,57 @@ def get_submeshes(file, index, pos_verts, uv_verts, weights, jud_vcs, vert_colou
         else:
             submesh.weights = []
 
+        if submesh.name == '80b20b1f_0_3':
+            a = 0
+
         if vert_colours:
             submesh.vert_colours = trim_verts_data(vert_colours[:-1], dsort, vc=True)
             # submesh.vert_colours = vert_colours[:-1]
         if jud_shader and not any([x != [0, 0, 0, 0] for x in submesh.vert_colours]):
             vcs = []
-            for w in jud_vcs:
-                bitw = w & 0x7
+            if cloth_override:
                 vc = [0, 0, 0, 1]
-                # if not w & 0x8000:
-                #     vcs.append(vc)
-                #     continue
-                if bitw == 0:
+                if submesh.GearDyeChangeColourIndex == 0:
                     vc[0] = 0.333
-                elif bitw == 1:
+                elif submesh.GearDyeChangeColourIndex == 1:
                     vc[0] = 0.666
-                elif bitw == 2:
+                elif submesh.GearDyeChangeColourIndex == 2:
                     vc[0] = 0.999
-                elif bitw == 3:
+                elif submesh.GearDyeChangeColourIndex == 3:
                     vc[1] = 0.333
-                elif bitw == 4:
+                elif submesh.GearDyeChangeColourIndex == 4:
                     vc[1] = 0.666
-                elif bitw == 5:
+                elif submesh.GearDyeChangeColourIndex == 5:
                     vc[1] = 0.999
-                vcs.append(vc)
-            submesh.vert_colours = trim_verts_data(vcs, dsort)
+
+                if submesh.AlphaClip != 0:
+                    vc[2] = 0.25
+                submesh.vert_colours = [vc for x in range(len(submesh.pos_verts))]
+            else:
+                for w in jud_vcs:
+                    bitw = w & 0x7
+                    vc = [0, 0, 0, 1]
+                    # if not w & 0x8000:
+                    #     vcs.append(vc)
+                    #     continue
+                    if bitw == 0:
+                        vc[0] = 0.333
+                    elif bitw == 1:
+                        vc[0] = 0.666
+                    elif bitw == 2:
+                        vc[0] = 0.999
+                    elif bitw == 3:
+                        vc[1] = 0.333
+                    elif bitw == 4:
+                        vc[1] = 0.666
+                    elif bitw == 5:
+                        vc[1] = 0.999
+
+                    if submesh.AlphaClip != 0:
+                        vc[2] = 0.25
+
+                    vcs.append(vc)
+                submesh.vert_colours = trim_verts_data(vcs, dsort)
 
         alt = shift_faces_down(smfaces)
         submesh.faces = alt
@@ -962,6 +993,7 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
                 vert_colours = []
                 uv_verts = []
                 faces_file = faces_files[i]
+                cloth_override = False
                 pos_verts, jud_vcs = get_verts_data(pos_vert_file, all_file_info, is_uv=False)
 
                 pos_verts = scale_and_repos_pos_verts(pos_verts, fbdyn3, d)
@@ -970,6 +1002,7 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
                     uv_verts = scale_and_repos_uv_verts(uv_verts, fbdyn3)
 
                 if og_weight_files[i].uid != 'FFFFFFFF':
+                    cloth_override = True
                     weights = get_og_weights(all_file_info, og_weight_files[i])
                 elif skin_buffer_files[i].uid != 'FFFFFFFF':
                     weights = parse_skin_buffer(pos_vert_file, all_file_info, skin_buffer_files[i])
@@ -981,7 +1014,7 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
                     vert_colours = get_vert_colours(all_file_info, vert_colour_files[i])
 
                 face_hex = get_face_hex(faces_file, all_file_info)
-                submeshes = get_submeshes(model_file, i, pos_verts, uv_verts, weights, jud_vcs, vert_colours, face_hex, jud_shader, obfuscate)
+                submeshes = get_submeshes(model_file, i, pos_verts, uv_verts, weights, jud_vcs, vert_colours, face_hex, jud_shader, obfuscate, cloth_override)
                 first_mat = None
                 submeshes_to_write = []
                 for submesh in submeshes:
@@ -1222,7 +1255,7 @@ def try_get_material_textures(submesh, temp_direc, b_apply_textures, hash64_tabl
 
     # image_indices = [gf.get_file_from_hash(submesh.material.fhex[offset+16+8*(2*i):offset+16+8*(2*i)+8]) for i in range(count)]
     with open(f'I:/dynamic_models/{temp_direc}/textures/tex.txt', 'a') as f:
-        f.write(f'Submesh {submesh.name} textures: {submesh.textures}\n')
+        f.write(f'Submesh {submesh.name} material: {str(hashlib.md5(submesh.material.name.encode()).hexdigest())[:8]} | textures: {submesh.textures}\n')
     if not submesh.diffuse:  # Not sure on this, causes a lot of things to break
         if b_apply_textures:
             submesh.diffuse = submesh.textures[0]
@@ -1247,7 +1280,8 @@ def parse_skin_buffer(verts_file, all_file_info, skin_file):
 
     ref_file = gf.get_file_from_hash(all_file_info[skin_file.name]['Reference'])
     skin_fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(ref_file)}/{ref_file}.bin', 'rb').read()
-
+    if len(skin_fb) < 32:
+        return
     last_blend_value = 0
     last_blend_count = 0
 
@@ -1263,6 +1297,8 @@ def parse_skin_buffer(verts_file, all_file_info, skin_file):
         if i % 32 == 0 and i != 0 and not in_header:
             header_offset = i - 64
             break
+        if i >= len(skin_fb):
+            return
     for w in verts_w:
         indices = [0, 0, 0, 0]
         weights = [1, 0, 0, 0]
@@ -1451,10 +1487,10 @@ if __name__ == '__main__':
     # parent_file = '01B6-02A5'  # incendior shield with the broken back and '01B6-02A8' and 02b7 02ba 02dd
     # parent_file = '0158-052A'  # eris broken, new is 0158-052A dyn1, old is prob 0938-00B9
 
-    parent_file = '011C-1130'
+    parent_file = '01BC-08B5'
     get_model(parent_file, all_file_info, hash64_table, temp_direc=parent_file, lod=True, b_textures=True,
-              b_apply_textures=True, b_shaders=False, passing_dyn3=False, b_skeleton=False,
-              obfuscate=False, b_collect_extra_textures=False)
+              b_apply_textures=True, b_shaders=False, passing_dyn3=False, b_skeleton=True,
+              obfuscate=True, b_collect_extra_textures=True)
     quit()
 
     select = 'cinematic'

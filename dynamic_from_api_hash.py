@@ -132,6 +132,7 @@ if __name__ == '__main__':
 
     pkg_db.start_db_connection(f'I:/d2_pkg_db/hash64/{version}.db')
     hash64_table = {x: y for x, y in pkg_db.get_entries_from_table('Everything', 'Hash64, Reference')}
+    hash64_table['0000000000000000'] = 'FFFFFFFF'
 
     pkg_db.start_db_connection(f'I:/d2_pkg_db/{version}.db')
     all_file_info = {x[0]: dict(zip(['Reference', 'FileType'], x[1:])) for x in
@@ -139,7 +140,7 @@ if __name__ == '__main__':
 
     # Moonfang cloak 2701727616 (cloaks dont get exported)
     # Moonfang crown 2288398391
-    api_hash = 197761153
+    api_hash = 2156817213
     get_armour_from_api(api_hash, strinfo)
 
     # Trials auto 1909527966
@@ -147,8 +148,8 @@ if __name__ == '__main__':
     # Eystein-D (lots of sights) 1291586825
     # Cold denial 1216130969
 
-    api_hash = 1030895163
-    get_weapon_from_api(api_hash, strinfo)
+    api_hash = 2702372534
+    # get_weapon_from_api(api_hash, strinfo)
 
     api_hash = 1839565992
     # get_weapon_from_api(api_hash, strinfo)
