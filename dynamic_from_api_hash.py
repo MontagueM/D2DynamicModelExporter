@@ -10,22 +10,22 @@ def get_armour_from_api(api_hash, strinfo, mass=False, byte=False):
     else:
         apihsh = bytes.fromhex(gf.get_flipped_hex(gf.fill_hex_with_zeros(hex(api_hash)[2:], 8), 8))
     print(apihsh)
-    table = '0279-114A'
-    fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(table)}/{table}.bin', 'rb').read()
+    table = '0283-1AA6'
+    fb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(table)}/{table}.bin', 'rb').read()
     offset = fb.find(apihsh) + 8
     if offset == 7:
         raise Exception(f'Hash {apihsh} not found in table 1')
     hshs = [fb[offset:offset+4], fb[offset+4:offset+8]]
     for i, hsh in enumerate(hshs):
         table = '020D-12BE'
-        fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(table)}/{table}.bin', 'rb').read()
+        fb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(table)}/{table}.bin', 'rb').read()
         offset = fb.find(hsh) + 4
         if offset == 3:
             raise Exception(f'Hash {hsh} not found in table 2')
         print(fb[offset:offset+4].hex())
 
         file = gf.get_file_from_hash(fb[offset:offset+4].hex())
-        fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(file)}/{file}.bin', 'rb').read()
+        fb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(file)}/{file}.bin', 'rb').read()
         dyn1 = gf.get_file_from_hash(hash64_table[fb[0x10:0x10+8].hex().upper()])
         if dyn1 == 'FBFF-1FFF':
             print('No dyn1')
@@ -37,26 +37,26 @@ def get_armour_from_api(api_hash, strinfo, mass=False, byte=False):
             apiname += '_male'
         else:
             apiname += '_female'
-        if not ret:
-            return
+        # if not ret:
+        #     return
         if mass:
             temp_direc = f'apimass/api_{apiname}'
         else:
             temp_direc = f'api_{apiname}'
-        dme.get_model(dyn1, all_file_info, hash64_table, lod=lod_filter, temp_direc=temp_direc, passing_dyn3=False, obfuscate=False, b_apply_textures=False,
-                  b_shaders=False, b_textures=True, jud_shader=True, from_api=True, b_skeleton=True)
+        dme.get_model(dyn1, all_file_info, hash64_table, lod=lod_filter, temp_direc=temp_direc, passing_dyn3=False, obfuscate=True, b_apply_textures=True,
+                  b_shaders=False, b_textures=True, jud_shader=True, from_api=True, b_skeleton=True, b_collect_extra_textures=True)
 
 
 def get_weapon_from_api(api_hash, strinfo, mass=False, byte=False):
     if byte:
         apihsh = api_hash
     else:
-        apihsh = bytes.fromhex(gf.get_flipped_hex(hex(api_hash)[2:], 8))
+        apihsh = bytes.fromhex(gf.get_flipped_hex(gf.fill_hex_with_zeros(hex(api_hash)[2:], 8), 8))
     print(apihsh)
-    table = '0279-114A'
+    table = '0283-1AA6'
     tableb = '020D-12BE'
-    fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(table)}/{table}.bin', 'rb').read()
-    fbb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(tableb)}/{tableb}.bin', 'rb').read()
+    fb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(table)}/{table}.bin', 'rb').read()
+    fbb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(tableb)}/{tableb}.bin', 'rb').read()
     offset = fb.find(apihsh) + 0x18
     if offset == 0x17:
         raise Exception(f'Hash {apihsh} not found in table 1')
@@ -77,7 +77,7 @@ def get_weapon_from_api(api_hash, strinfo, mass=False, byte=False):
             if off == 3:
                 raise Exception(f'Hash {d} not found in 1F61 table')
             unk_file = gf.get_file_from_hash(fbb[off:off+4].hex())
-            fbu = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(unk_file)}/{unk_file}.bin', 'rb').read()
+            fbu = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(unk_file)}/{unk_file}.bin', 'rb').read()
             dyn1 = gf.get_file_from_hash(hash64_table[fbu[0x10:0x10+8].hex().upper()])
             if dyn1 == 'FBFF-1FFF':
                 print('dyn1 not available')
@@ -92,18 +92,18 @@ def get_weapon_from_api(api_hash, strinfo, mass=False, byte=False):
             else:
                 temp_direc = f'api_{apiname}'
             dme.get_model(dyn1, all_file_info, hash64_table, lod=lod_filter, temp_direc=temp_direc, passing_dyn3=False, obfuscate=True, b_apply_textures=True,
-                      b_shaders=False, b_textures=True, from_api=True, jud_shader=True, b_skeleton=False, b_collect_extra_textures=True)
+                      b_shaders=False, b_textures=True, from_api=True, jud_shader=True, b_skeleton=True, b_collect_extra_textures=True)
 
 
 def get_name_from_api(api_hash, strinfo):
-    table = '0279-1129'
-    fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(table)}/{table}.bin', 'rb').read()
+    table = '0283-1A8C'
+    fb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(table)}/{table}.bin', 'rb').read()
     offset = fb.find(api_hash) + 0x10
     if offset == 0xF:
         print(f'Hash {api_hash} not found in text table')
         return str(int.from_bytes(api_hash, byteorder='little', signed=False)), False
     tfile = gf.get_file_from_hash(fb[offset:offset+4].hex())
-    fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(tfile)}/{tfile}.bin', 'rb').read()
+    fb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(tfile)}/{tfile}.bin', 'rb').read()
     stringhsh = fb[0x84:0x84+0x8].hex().upper()
     if stringhsh not in strinfo.keys():
         print(f'{stringhsh} not in text db.')
@@ -113,8 +113,8 @@ def get_name_from_api(api_hash, strinfo):
 
 
 def mass_export(strinfo):
-    table = '0279-114A'
-    fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(table)}/{table}.bin', 'rb').read()
+    table = '0283-1AA6'
+    fb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(table)}/{table}.bin', 'rb').read()
     for i in range(0x40, 4301*0x20, 0x20):
     # for i in range(4301 * 0x20, 0x40, -0x20):
         bhsh = fb[i:i+4]
@@ -126,7 +126,7 @@ def mass_export(strinfo):
 
 
 if __name__ == '__main__':
-    version = '3_0_2_0'
+    version = '3_1_0_0'
     pkg_db.start_db_connection(version=f'C:/Users\monta\OneDrive\Destiny 2 Datamining\TextExtractor\db/{version}.db')
     strinfo = {x: y for x, y in pkg_db.get_entries_from_table('Everything', 'Hash, String')}
 
@@ -140,16 +140,16 @@ if __name__ == '__main__':
 
     # Moonfang cloak 2701727616 (cloaks dont get exported)
     # Moonfang crown 2288398391
-    api_hash = 2156817213
-    get_armour_from_api(api_hash, strinfo)
+    api_hash = 3100185651
+    # get_armour_from_api(api_hash, strinfo)
 
     # Trials auto 1909527966
     # Ace of spades 347366834
     # Eystein-D (lots of sights) 1291586825
     # Cold denial 1216130969
 
-    api_hash = 2702372534
-    # get_weapon_from_api(api_hash, strinfo)
+    api_hash = 1097616550
+    get_weapon_from_api(api_hash, strinfo)
 
     api_hash = 1839565992
     # get_weapon_from_api(api_hash, strinfo)

@@ -243,7 +243,7 @@ def get_image_from_file(file_path, all_file_info, save_path=None):
     ref_pkg = gf.get_pkg_name(ref_file)
     if all_file_info[file_name]['FileType'] == 'Texture Header':
         header_hex = gf.get_hex_data(file_path)
-        data_hex = gf.get_hex_data(f'I:/d2_output_3_0_2_0/{ref_pkg}/{ref_file}.bin')
+        data_hex = gf.get_hex_data(f'I:/d2_output_3_1_0_0/{ref_pkg}/{ref_file}.bin')
     elif all_file_info[file_name]['FileType'] == 'Texture Data':
         print('Only pass through header please, cba to fix this.')
         return
@@ -258,14 +258,14 @@ def get_image_from_file(file_path, all_file_info, save_path=None):
     if large_tex_hash != 'FFFFFFFF':
         large_file = gf.get_file_from_hash(large_tex_hash)
         pkg_name = gf.get_pkg_name(large_file)
-        data_hex = gf.get_hex_data(f'I:/d2_output_3_0_2_0/{pkg_name}/{large_file}.bin')
+        data_hex = gf.get_hex_data(f'I:/d2_output_3_1_0_0/{pkg_name}/{large_file}.bin')
     print(ref_file)
     img = get_image_from_data(header, dimensions, data_hex)
     if img:
         if save_path:
             img.save(f'{save_path}/{file_name}.tga')
         # else:
-        #     img.save(f'C:/d2_output_2_9_2_0_images/{file_pkg}/{file_name}.png')
+        #     img.save(f'C:/d2_output_2_9_2_0_images/{file_pkg}/{file_name}.tga')
         #     img.show()
 
 
@@ -339,10 +339,22 @@ def get_image_from_data(header, dimensions, data_hex):
     return img
 
 
+def get_all_client_images():
+    for file, data in all_file_info.items():
+        if data['FileType'] == 'Texture Header':
+            pkg = gf.get_pkg_name(file)
+            if 'client' not in pkg:
+                continue
+            gf.mkdir(f'I:/d2_images_3_1_0_0/{pkg}/')
+            get_image_from_file(f'I:/d2_output_3_1_0_0/{pkg}/{file}.bin', all_file_info, f'I:/d2_images_3_1_0_0/{pkg}/')
+
+
 if __name__ == '__main__':
-    pkg_db.start_db_connection(f'I:/d2_pkg_db/3_0_2_0.db')
+    pkg_db.start_db_connection(f'I:/d2_pkg_db/3_1_0_0invest.db')
     all_file_info = {x[0]: dict(zip(['Reference', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, Reference, FileType')}
 
-    img = '0157-1B15'
-    get_image_from_file(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(img)}/{img}.bin', all_file_info, 'imagetests/')
+    # img = '0270-14F1'
+    # get_image_from_file(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(img)}/{img}.bin', all_file_info, 'imagetests/')
+
+    get_all_client_images()

@@ -37,7 +37,7 @@ def get_skeleton(file, names):
     default_object_space_transforms is dost
     default_inverse_object_space_transforms is diost
     """
-    fbin = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(file)}/{file}.bin', 'rb').read()
+    fbin = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(file)}/{file}.bin', 'rb').read()
     offset = fbin.find(b'\x42\x86\x80\x80')
     if offset == -1:
         raise Exception('Not valid file')

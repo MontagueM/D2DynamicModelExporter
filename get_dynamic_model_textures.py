@@ -44,7 +44,7 @@ class File:
         return self.pkg_name
 
     def get_fb(self):
-        self.fb = open(f'I:/d2_output_3_0_2_0/{self.pkg_name}/{self.name}.bin', 'rb').read()
+        self.fb = open(f'I:/d2_output_3_1_0_0/{self.pkg_name}/{self.name}.bin', 'rb').read()
 
 
 class HeaderFile(File):
@@ -82,7 +82,7 @@ def get_header(file_hex, header):
     return header
 
 
-test_dir = 'I:/d2_output_3_0_2_0'
+test_dir = 'I:/d2_output_3_1_0_0'
 bad_files = []
 
 # def get_referenced_file(file):
@@ -399,7 +399,7 @@ def trim_verts_data(verts_data, dsort, vc=False):
 def get_submeshes(file, index, pos_verts, uv_verts, weights, jud_vcs, vert_colours, face_hex, jud_shader, obfuscate, cloth_override):
     # faces_ = faces
     # Getting the submesh table entries
-    fbin = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(file)}/{file}.bin', 'rb').read()
+    fbin = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(file)}/{file}.bin', 'rb').read()
     # offset = fbin.find(b'\xCB\x6E\x80\x80')
     offset = [m.start() for m in re.finditer(b'\xCB\x6E\x80\x80', fbin)][index]
     if offset == -1:
@@ -448,6 +448,8 @@ def get_submeshes(file, index, pos_verts, uv_verts, weights, jud_vcs, vert_colou
         submesh.AlphaClip = entry.Flags & 0x8
         submesh.lod_level = entry.LODLevel
         submesh.name = f'{gf.get_hash_from_file(file)}_{i}_{submesh.lod_level}'
+        if submesh.name == '80bd2765_4_0':
+            a = 0
         if obfuscate:
             submesh.name = f'{str(hashlib.md5(gf.get_hash_from_file(file).encode()).hexdigest())[:8]}_{i}_{submesh.lod_level}'
 
@@ -757,14 +759,11 @@ def get_face_hex(faces_file, all_file_info) -> str:
     return ''
 
 
-def get_obj_str(verts_data, faces_data, vts):
+def get_obj_str(verts_data, faces_data):
     verts_str = ''
     for coord in verts_data:
         verts_str += f'v {coord[0]*100} {coord[1]*100} {coord[2]*100}\n'
     faces_str = ''
-    for coord in vts:
-        if coord:
-            verts_str += f'vt {coord[0]} {coord[1]}\n'
     for face in faces_data:
         faces_str += f'f {face[0]}// {face[1]}// {face[2]}//\n'
     return verts_str + faces_str
@@ -874,7 +873,7 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
     if passing_dyn3:
         model_file = parent_file
         skel_file = ''
-        fbdyn3 = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(model_file)}/{model_file}.bin', 'rb').read()
+        fbdyn3 = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(model_file)}/{model_file}.bin', 'rb').read()
         # print(f'Parent file {model_file}')
         gf.mkdir(f'I:/dynamic_models/{temp_direc}/')
         gf.mkdir(f'I:/dynamic_models/{temp_direc}/textures/')
@@ -938,10 +937,10 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
     else:
         if b_verbose:
             print(f'Dyn1 {parent_file}')
-        fbdyn1 = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(parent_file)}/{parent_file}.bin', 'rb').read()
+        fbdyn1 = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(parent_file)}/{parent_file}.bin', 'rb').read()
         skel_file = gf.get_file_from_hash(bytes.hex(fbdyn1[0xB0:0xB0+4]))
         dyn2_primary = gf.get_file_from_hash(bytes.hex(fbdyn1[0xBC:0xBC + 4]))
-        skel = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(skel_file)}/{skel_file}.bin', 'rb').read()
+        skel = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(skel_file)}/{skel_file}.bin', 'rb').read()
         if b'\x42\x86\x80\x80' not in skel:  # Using default player skeleton
             dyn2_primary = skel_file
             # skel_file = '0186-138F'  # Body
@@ -962,7 +961,7 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
                 if b_verbose:
                     print('Model file empty')
                 continue
-            fbdyn2 = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(dyn2)}/{dyn2}.bin', 'rb').read()
+            fbdyn2 = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(dyn2)}/{dyn2}.bin', 'rb').read()
             offset = gf.get_uint16(fbdyn2, 0x18) + 572
             if offset+4 > len(fbdyn2):
                 if b_verbose:
@@ -977,7 +976,7 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
                 if b_verbose:
                     print('Model file empty')
                 continue
-            fbdyn3 = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(model_file)}/{model_file}.bin', 'rb').read()
+            fbdyn3 = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(model_file)}/{model_file}.bin', 'rb').read()
             if b_verbose:
                 print(f'Dyn2 {dyn2}')
                 print(f'Dyn3 {model_file}')
@@ -1050,14 +1049,14 @@ def get_model(parent_file, all_file_info, hash64_table, temp_direc='', lod=True,
         if b_collect_extra_textures:
             if b_verbose:
                 print('Collecting extra textures...')
-            collect_extra_textures(open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(dyn2_primary)}/{dyn2_primary}.bin', 'rb').read(), temp_direc, b_verbose)
+            collect_extra_textures(open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(dyn2_primary)}/{dyn2_primary}.bin', 'rb').read(), temp_direc, b_verbose, hash64_table, all_file_info)
         if not custom_export:
             export_fbx(b_temp_direc_full, model, temp_direc, parent_file, obfuscate)
         else:
             return all_submeshes
 
 
-def collect_extra_textures(fb, temp_direc, b_verbose):
+def collect_extra_textures(fb, temp_direc, b_verbose, hash64_table, all_file_info):
     offset = fb.find(b'\x14\x00\x80\x80')
     if offset == -1:
         if b_verbose:
@@ -1069,7 +1068,9 @@ def collect_extra_textures(fb, temp_direc, b_verbose):
     mats = list(set([fb[i:i+4] for i in range(offset, offset+count*4, 4)]))
     for m in mats:
         mat = gf.get_file_from_hash(m.hex())
-        mfb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(mat)}/{mat}.bin', 'rb').read()
+        if mat == 'FBFF-1FFF':
+            continue
+        mfb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(mat)}/{mat}.bin', 'rb').read()
         off = mfb.find(b'\xCF\x6D\x80\x80')
         if off == -1:
             continue
@@ -1083,13 +1084,13 @@ def collect_extra_textures(fb, temp_direc, b_verbose):
             textures = [x for x in [gf.get_file_from_hash(mfb[off + 0x10 + 24 * i:off + 0x10 + 24 * i + 4].hex().upper()) for i in range(c)] if x != 'FBFF-1FFF']
         for img in textures:
             if not os.path.exists(f'I:/dynamic_models/{temp_direc}/unk_textures/{img}.tga'):
-                imager.get_image_from_file(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(img)}/{img}.bin', all_file_info, f'I:/dynamic_models/{temp_direc}/unk_textures/')
+                imager.get_image_from_file(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(img)}/{img}.bin', all_file_info, f'I:/dynamic_models/{temp_direc}/unk_textures/')
 
 
 def get_vert_colours(all_file_info, vert_colour_file):
     vert_colours = []
     ref_file = gf.get_file_from_hash(all_file_info[vert_colour_file.name]['Reference'])
-    fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(ref_file)}/{ref_file}.bin', 'rb').read()
+    fb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(ref_file)}/{ref_file}.bin', 'rb').read()
     for i in range(0, len(fb), 4):
         vcs = []
         for j in range(4):
@@ -1104,7 +1105,7 @@ def get_vert_colours(all_file_info, vert_colour_file):
 def get_og_weights(all_file_info, og_weight_file):
     weights_pairs = []
     ref_file = gf.get_file_from_hash(all_file_info[og_weight_file.name]['Reference'])
-    fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(ref_file)}/{ref_file}.bin', 'rb').read()
+    fb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(ref_file)}/{ref_file}.bin', 'rb').read()
     for i in range(0, len(fb), 8):
         weights = [x/255 for x in fb[i:i+4]]
         weight_indices = [x for x in fb[i+4:i + 8] if x != 254]
@@ -1122,7 +1123,7 @@ def add_to_fbx(model, bones, submeshes, parent_file, name, temp_direc, b_temp_di
 
 
     for submesh in submeshes:
-        mesh = create_mesh(model, submesh, name, skel_file)
+        mesh = create_mesh(model, submesh, name, skel_file and submesh.weights and bones)
         if not mesh.GetLayer(0):
             mesh.CreateLayer()
         layer = mesh.GetLayer(0)
@@ -1193,7 +1194,7 @@ def get_material_textures(material, texture_offset, hash64_table, all_file_info,
             if not os.path.exists(f'{custom_dir}/{img}.tga'):
                 if img == 'FBFF-1FFF':
                     continue
-                imager.get_image_from_file(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(img)}/{img}.bin', all_file_info, f'{custom_dir}/')
+                imager.get_image_from_file(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(img)}/{img}.bin', all_file_info, f'{custom_dir}/')
     return images
 
 
@@ -1264,8 +1265,8 @@ def try_get_material_textures(submesh, temp_direc, b_apply_textures, hash64_tabl
             continue
         # if not os.path.exists(f'I:/dynamic_models/{temp_direc}/textures/{img}.dds'):
         if not os.path.exists(f'I:/dynamic_models/{temp_direc}/textures/{img}.tga'):
-        # imager.get_image_from_file(f'I:/d2_output_3_0_2_0//{gf.get_pkg_name(img)}/{img}.bin', all_file_info, f'I:/dynamic_models/{temp_direc}/textures/{img}.dds')
-            imager.get_image_from_file(f'I:/d2_output_3_0_2_0//{gf.get_pkg_name(img)}/{img}.bin', all_file_info, f'I:/dynamic_models/{temp_direc}/textures/')
+        # imager.get_image_from_file(f'I:/d2_output_3_1_0_0//{gf.get_pkg_name(img)}/{img}.bin', all_file_info, f'I:/dynamic_models/{temp_direc}/textures/{img}.dds')
+            imager.get_image_from_file(f'I:/d2_output_3_1_0_0//{gf.get_pkg_name(img)}/{img}.bin', all_file_info, f'I:/dynamic_models/{temp_direc}/textures/')
 
 
 def parse_skin_buffer(verts_file, all_file_info, skin_file):
@@ -1274,12 +1275,12 @@ def parse_skin_buffer(verts_file, all_file_info, skin_file):
 
     out_weights = []
     ref_file = gf.get_file_from_hash(all_file_info[verts_file.name]['Reference'])
-    verts_fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(ref_file)}/{ref_file}.bin', 'rb').read()
+    verts_fb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(ref_file)}/{ref_file}.bin', 'rb').read()
     verts_w = [int.from_bytes(verts_fb[i:i + 2], byteorder='little', signed=True) for i in
                range(0, len(verts_fb), 2) if i % 24 == 6]
 
     ref_file = gf.get_file_from_hash(all_file_info[skin_file.name]['Reference'])
-    skin_fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(ref_file)}/{ref_file}.bin', 'rb').read()
+    skin_fb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(ref_file)}/{ref_file}.bin', 'rb').read()
     if any([w & 0xf800 != 0 for w in verts_w]):
         if len(skin_fb) < 32:
             return
@@ -1319,7 +1320,9 @@ def parse_skin_buffer(verts_file, all_file_info, skin_file):
         elif blend_flags == 0:
             indices[0] = blend_index
         else:
-            raise Exception('Unk flag used in skin buffer')
+            print('Unk flag used in skin buffer')
+            return
+            # raise Exception('Unk flag used in skin buffer')
 
         if buffer_size > 0:
             if last_blend_value != blend_index:
@@ -1410,9 +1413,9 @@ def save_texture_plates(dyn1, all_file_info, temp_direc, b_temp_direc_full, subm
             s.diffuse = f'{sn}_diffuse'
 
 
-def create_mesh(model, submesh: Submesh, name, skel_file):
+def create_mesh(model, submesh: Submesh, name, skel):
     mesh = fbx.FbxMesh.Create(model.scene, name)
-    if skel_file:
+    if skel:
         controlpoints = [fbx.FbxVector4(-x[0] * 100, x[2] * 100, x[1] * 100) for x in submesh.pos_verts]
     else:
         controlpoints = [fbx.FbxVector4(-x[0], x[2], x[1]) for x in submesh.pos_verts]
@@ -1456,7 +1459,7 @@ def export_all_models(pkg_name, all_file_info, select, lod_filter, b_textures, b
 
 
 if __name__ == '__main__':
-    version = '3_0_2_0'
+    version = '3_1_0_0'
     pkg_db.start_db_connection(f'I:/d2_pkg_db/hash64/{version}.db')
     hash64_table = {x: y for x, y in pkg_db.get_entries_from_table('Everything', 'Hash64, Reference')}
     hash64_table['0000000000000000'] = 'FFFFFFFF'
@@ -1488,18 +1491,20 @@ if __name__ == '__main__':
     # parent_file = '01B6-02A5'  # incendior shield with the broken back and '01B6-02A8' and 02b7 02ba 02dd
     # parent_file = '0158-052A'  # eris broken, new is 0158-052A dyn1, old is prob 0938-00B9
 
-    parent_file = '0156-1668'
-    # get_model(parent_file, all_file_info, hash64_table, temp_direc=parent_file, lod=True, b_textures=True,
-    #           b_apply_textures=True, b_shaders=False, passing_dyn3=False, b_skeleton=True,
-    #           obfuscate=True, b_collect_extra_textures=True)
-    # quit()
+    parent_file = '0170-1420'
+    get_model(parent_file, all_file_info, hash64_table, temp_direc=parent_file, lod=True, b_textures=True,
+              b_apply_textures=True, b_shaders=False, passing_dyn3=False, b_skeleton=False,
+              obfuscate=False, b_collect_extra_textures=True)
+    quit()
 
-    select = '0156'
+    select = '02f7'
     folder = select
-    for pkg in pkg_db.get_all_tables():
+    for pkg in pkg_db.get_all_tables()[::-1]:
         if select in pkg:
+            # if 'weapons' in pkg:
+            #     continue
             gf.mkdir(f'I:/dynamic_models/{pkg}')
             # if pkg not in os.listdir('C:/d2_model_temp/texture_models/tower'):
-            export_all_models(pkg, all_file_info, folder, lod_filter=True, b_textures=False, b_skeleton=True, obfuscate=True)
+            export_all_models(pkg, all_file_info, folder, lod_filter=True, b_textures=True, b_skeleton=False, obfuscate=False)
 
     print(bad_files)

@@ -52,7 +52,7 @@ def get_image_from_data(header, dimensions, data_hex):
 
 def get_image_png(tex_header, all_file_info):  # Tex Header must be a hash
     # name = gf.get_file_from_hash(tex_header)
-    fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(tex_header)}/{tex_header}.bin', 'rb').read()
+    fb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(tex_header)}/{tex_header}.bin', 'rb').read()
     header = ImageHeader()
     header.Width = gf.get_int16(fb, 0x22)
     header.Height = gf.get_int16(fb, 0x24)
@@ -61,5 +61,5 @@ def get_image_png(tex_header, all_file_info):  # Tex Header must be a hash
     ref_file = gf.get_file_from_hash(all_file_info[tex_header]['Reference'])
     if header.LargeTextureHash != b'ffffffff':
         ref_file = gf.get_file_from_hash(all_file_info[header.LargeTextureHash]['Reference'])
-    fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(ref_file)}/{ref_file}.bin', 'rb').read()
+    fb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(ref_file)}/{ref_file}.bin', 'rb').read()
     return get_image_from_data(header, [header.Width, header.Height], fb)

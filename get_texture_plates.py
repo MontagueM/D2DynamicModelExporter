@@ -20,13 +20,13 @@ class TexturePlateSet:
 
     def get_plates(self, direct_from_tex):
         if not direct_from_tex:
-            fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(self.topfile)}/{self.topfile}.bin', 'rb').read()
+            fb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(self.topfile)}/{self.topfile}.bin', 'rb').read()
             # This offset is a guess for now
             offset = fb.find(b'\xCD\x9A\x80\x80')+8
             dyn2 = gf.get_file_from_hash(bytes.hex(fb[offset:offset+4]))
             if dyn2 == '0400-0000':
                 return
-            fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(dyn2)}/{dyn2}.bin', 'rb').read()
+            fb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(dyn2)}/{dyn2}.bin', 'rb').read()
             offset = gf.get_uint16(fb, 0x18) + 712
             if offset > len(fb):
                 return
@@ -34,7 +34,7 @@ class TexturePlateSet:
         else:
             platesetfile = self.topfile
         try:
-            fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(platesetfile)}/{platesetfile}.bin', 'rb').read()
+            fb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(platesetfile)}/{platesetfile}.bin', 'rb').read()
         except FileNotFoundError:
             return False
         a = TexturePlate(gf.get_file_from_hash(bytes.hex(fb[0x28:0x28+4])), 'diffuse')
@@ -62,7 +62,7 @@ class TexturePlate:
     def get_plate_data(self):
         if self.file == 'FBFF-1FFF' or '0400-' in self.file:
             return False
-        fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(self.file)}/{self.file}.bin', 'rb').read()
+        fb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(self.file)}/{self.file}.bin', 'rb').read()
         file_count = gf.get_uint16(fb, 0x30)
         table_offset = 0x40
         dimension_flag = fb[0xA]
@@ -109,7 +109,7 @@ class Texture:
 
 
 if __name__ == '__main__':
-    pkg_db.start_db_connection('3_0_2_0')
+    pkg_db.start_db_connection('3_1_0_0')
     all_file_info = {x: y for x, y in {x[0]: dict(zip(['Reference', 'FileType'], x[1:])) for x in
                                        pkg_db.get_entries_from_table('Everything',
                                                                      'FileName, Reference, FileType')}.items()}
