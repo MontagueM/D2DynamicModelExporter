@@ -172,7 +172,7 @@ def create_mesh(model, submesh, name, skel_file):
     return mesh
 
 
-def get_8E8E8080_table(table_file):
+def get_8E8E8080_table(table_file, export=False):
     dic = {}
     mainfb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(table_file)}/{table_file}.bin', 'rb').read()
     find = [m.start() for m in re.finditer(b'\x48\x89\x80\x80', mainfb)]
@@ -234,6 +234,12 @@ def get_8E8E8080_table(table_file):
 
     [list(x).sort(key=lambda u: u[1]) for x in dic.values()]
     print([print(x, y) for x,y in dic.items()])
+    if export:
+        for x in dic[export]:
+            get_map(x[0])
+
+
+
 
 
 def get_all_named_maps(export):
@@ -302,5 +308,5 @@ if __name__ == '__main__':
                      pkg_db.get_entries_from_table('Everything', 'FileName, Reference, FileType')}
 
     # get_all_named_maps(export=False)
-    get_map('0232-009A')
-    # get_8E8E8080_table('022E-1EC4')
+    get_map('02E6-0C7D')
+    # get_8E8E8080_table('02E6-019B')#, export='enc_s13_presage_secret_start')
